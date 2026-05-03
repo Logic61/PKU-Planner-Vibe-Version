@@ -1,5 +1,8 @@
 #include <QApplication>
+#include "models/datamanager.h"
 #include "mainwindow.h"
+#include <QDebug>
+#include <QMessageBox>
 
 int main(int argc, char *argv[])
 {
@@ -12,6 +15,10 @@ int main(int argc, char *argv[])
     )");
 
     MainWindow w;
+    
+    // Initialize DataManager after MainWindow is created
+    DataManager::instance();
+    
     w.resize(1200, 800);
     w.show();
 

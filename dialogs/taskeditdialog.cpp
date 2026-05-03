@@ -1,4 +1,5 @@
 #include "taskeditdialog.h"
+#include "../models/datamanager.h"
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QLineEdit>
@@ -6,10 +7,8 @@
 #include <QSpinBox>
 #include <QPushButton>
 #include <QDialogButtonBox>
-#include <QJsonDocument>
-#include <QJsonArray>
-#include <QFile>
-#include <QJsonObject>
+#include <QFrame>
+#include <QCalendarWidget>
 
 TaskEditDialog::TaskEditDialog(QWidget *parent, const QString &defaultCourse)
     : QDialog(parent)
@@ -36,6 +35,30 @@ TaskEditDialog::TaskEditDialog(QWidget *parent, const QString &defaultCourse)
     titleEdit = new QLineEdit();
     deadlineEdit = new QDateTimeEdit(QDateTime::currentDateTime());
     deadlineEdit->setCalendarPopup(true);
+    if (QCalendarWidget *calendar = deadlineEdit->calendarWidget()) {
+        calendar->setStyleSheet(R"(
+            QCalendarWidget QWidget {
+                color: #222;
+                background: white;
+            }
+            QCalendarWidget QToolButton {
+                color: #222;
+                background: transparent;
+                border: none;
+                font-weight: 600;
+            }
+            QCalendarWidget QMenu {
+                background: white;
+                color: #222;
+            }
+            QCalendarWidget QAbstractItemView {
+                selection-background-color: #8B1E2D;
+                selection-color: white;
+                background: white;
+                color: #222;
+            }
+        )");
+    }
     priorityCombo = new QComboBox();
     priorityCombo->addItems({"低", "中", "高"});
     hoursSpin = new QSpinBox();
@@ -44,23 +67,10 @@ TaskEditDialog::TaskEditDialog(QWidget *parent, const QString &defaultCourse)
     courseCombo = new QComboBox();
     courseCombo->addItem("请选择课程");
 
-    // 从courses.json加载课程
-    QFile courseFile("courses.json");
-    if (courseFile.open(QIODevice::ReadOnly)) {
-        QJsonDocument doc = QJsonDocument::fromJson(courseFile.readAll());
-        if (doc.isArray()) {
-            QJsonArray courseArray = doc.array();
-            for (const auto &item : courseArray) {
-                if (item.isObject()) {
-                    QJsonObject courseObj = item.toObject();
-                    QString courseName = courseObj["name"].toString();
-                    if (!courseName.isEmpty()) {
-                        courseCombo->addItem(courseName);
-                    }
-                }
-            }
+    for (const Course &course : DataManager::instance().courses()) {
+        if (!course.name.isEmpty()) {
+            courseCombo->addItem(course.name);
         }
-        courseFile.close();
     }
 
     // 设置默认课程
@@ -89,25 +99,32 @@ TaskEditDialog::TaskEditDialog(QWidget *parent, const QString &defaultCourse)
     mainLayout->addWidget(buttons);
 
     setStyleSheet(R"(
+        QDialog {
+            background: transparent;
+        }
         QLineEdit {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 8px;
+            color: #222;
         }
         QDateTimeEdit {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 8px;
+            color: #222;
         }
         QComboBox {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 8px;
+            color: #222;
         }
         QSpinBox {
             border: 1px solid #ddd;
             border-radius: 8px;
             padding: 8px;
+            color: #222;
         }
         QPushButton {
             background: #8B1E2D;
@@ -139,4 +156,15 @@ int TaskEditDialog::getEstimatedHours() const {
 
 QString TaskEditDialog::getCourseName() const {
     return courseCombo->currentText();
+}
+
+void TaskEditDialog::setTaskData(const Task &task) {
+    titleEdit->setText(task.title);
+    deadlineEdit->setDateTime(task.deadline);
+    priorityCombo->setCurrentIndex(task.priority);
+
+    const int index = courseCombo->findText(task.course);
+    if (index != -1) {
+        courseCombo->setCurrentIndex(index);
+    }
 }

@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QComboBox>
+#include <QLineEdit>
 
 class QTableView;
 class TaskModel;
@@ -18,8 +19,15 @@ private:
     TaskModel *model;
     QTableView *table;
     QComboBox *courseFilter;
+    QComboBox *timeFilter;
+    QComboBox *statusFilter;
+    QLineEdit *searchEdit;
 
     QWidget* createFilterBar();
+    void refreshCourseFilter();
+    void refreshTasks();
+    void applyFilter();
+    void editSelectedTask();
 };
 
 #endif

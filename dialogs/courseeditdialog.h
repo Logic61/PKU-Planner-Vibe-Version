@@ -21,10 +21,11 @@ public:
     QString getExamTime() const;
     int getStart() const;
     int getEnd() const;
+    int getWeekType() const;
 
     void setCourseData(const QString &name, const QString &teacher, 
                       const QString &location, const QString &examTime,
-                      int start, int end);
+                      int start, int end, int weekType = 0);
 
 private slots:
     void onAccepted();
@@ -36,6 +37,7 @@ private:
     QLineEdit *examEdit;
     QComboBox *startCombo;
     QComboBox *endCombo;
+    QComboBox *weekTypeCombo;
 };
 
 #endif // COURSEEDITDIALOG_H

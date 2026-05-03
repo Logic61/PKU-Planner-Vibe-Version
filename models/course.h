@@ -15,6 +15,7 @@ struct Course {
     int day;           // 1-7 (周一到周日)
     int startPeriod;   // 起始节次
     int endPeriod;     // 结束节次
+    int weekType = 0;  // 0: All, 1: Odd, 2: Even
 
     QJsonObject toJson() const {
         QJsonObject obj;
@@ -25,6 +26,7 @@ struct Course {
         obj["day"] = day;
         obj["startPeriod"] = startPeriod;
         obj["endPeriod"] = endPeriod;
+        obj["weekType"] = weekType;
         return obj;
     }
 
@@ -37,6 +39,7 @@ struct Course {
         c.day = obj["day"].toInt();
         c.startPeriod = obj["startPeriod"].toInt();
         c.endPeriod = obj["endPeriod"].toInt();
+        c.weekType = obj["weekType"].toInt(0);
         return c;
     }
 };

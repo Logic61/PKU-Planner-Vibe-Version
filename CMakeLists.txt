@@ -19,6 +19,13 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 
+set(QT_DEPLOY_BIN_DIR "C:/Qt/6.10.0/mingw_64/bin")
+find_program(WINDEPLOYQT_EXECUTABLE
+    NAMES windeployqt windeployqt6
+    HINTS "${QT_DEPLOY_BIN_DIR}"
+    REQUIRED
+)
+
 set(PROJECT_SOURCES
     main.cpp
     mainwindow.cpp
@@ -39,6 +46,8 @@ set(PROJECT_SOURCES
     dialogs/courseactiondialog.h
     dialogs/taskeditdialog.cpp
     dialogs/taskeditdialog.h
+    models/datamanager.cpp
+    models/datamanager.h
     models/taskmodel.cpp
     models/taskmodel.h
     models/task.h
@@ -51,5 +60,10 @@ qt_add_executable(PKUPlanner
 )
 
 target_link_libraries(PKUPlanner PRIVATE Qt6::Widgets)
+
+add_custom_command(TARGET PKUPlanner POST_BUILD
+    COMMAND "${WINDEPLOYQT_EXECUTABLE}" --dir "$<TARGET_FILE_DIR:PKUPlanner>" "$<TARGET_FILE:PKUPlanner>"
+    COMMENT "Deploying Qt runtime for PKUPlanner"
+)
 
 qt_finalize_executable(PKUPlanner)

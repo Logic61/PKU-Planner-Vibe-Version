@@ -27,10 +27,8 @@ public slots:
     void editCourse(int index); // for editing/deleting
 
 private:
-    std::vector<Course> courses;
+    // std::vector<Course> courses; Removed and handled by DataManager
 
-    void saveCourses();
-    void loadCourses();
     void renderCourses();
     
     int getNearestDDL(const QString& courseName);

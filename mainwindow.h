@@ -14,10 +14,14 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
 
+private slots:
+    void initPages();
+
 private:
     QStackedWidget *stack;
     SidebarWidget *sidebar;
     TopbarWidget *topbar;
+    bool pagesInitialized = false;
 };
 
 #endif

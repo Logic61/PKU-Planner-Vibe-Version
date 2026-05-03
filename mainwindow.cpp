@@ -35,8 +35,9 @@ MainWindow::MainWindow(QWidget *parent)
     // 页面栈
     stack = new QStackedWidget;
 
-    stack->addWidget(new DashboardPage); // index 0
-    stack->addWidget(new TodoPage);      // index 1
+    // Add placeholder widgets
+    stack->addWidget(new QWidget()); // index 0 - will be replaced by DashboardPage
+    stack->addWidget(new QWidget()); // index 1 - will be replaced by TodoPage
 
     rightLayout->addWidget(topbar);
     rightLayout->addWidget(stack);
@@ -47,4 +48,22 @@ MainWindow::MainWindow(QWidget *parent)
     // 页面切换
     connect(sidebar, &SidebarWidget::pageChanged,
             stack, &QStackedWidget::setCurrentIndex);
+    
+    // Defer page initialization
+    QMetaObject::invokeMethod(this, "initPages", Qt::QueuedConnection);
+}
+
+void MainWindow::initPages()
+{
+    if (pagesInitialized) return;
+    pagesInitialized = true;
+    // Remove placeholder widgets and add real pages
+    QWidget *oldPage0 = stack->widget(0);
+    QWidget *oldPage1 = stack->widget(1);
+    stack->removeWidget(oldPage0);
+    stack->removeWidget(oldPage1);
+    delete oldPage0;
+    delete oldPage1;
+    stack->insertWidget(0, new DashboardPage);
+    stack->insertWidget(1, new TodoPage);
 }

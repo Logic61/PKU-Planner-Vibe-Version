@@ -5,6 +5,11 @@
 #include <QComboBox>
 #include <QSpinBox>
 #include <QDateTimeEdit>
+#include <QLineEdit>
+
+#include "../models/task.h"
+
+class QFrame;
 
 class TaskEditDialog : public QDialog
 {
@@ -18,6 +23,7 @@ public:
     int getPriority() const;
     int getEstimatedHours() const;
     QString getCourseName() const;
+    void setTaskData(const Task &task);
 
 private:
     QComboBox *courseCombo;
