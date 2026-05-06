@@ -11,6 +11,7 @@ struct Task
     QDateTime deadline;
     int priority; // 0=低 1=中 2=高
     bool completed = false;
+    QDateTime completedAt;
 
     int daysLeft() const
     {
@@ -20,6 +21,11 @@ struct Task
     bool isOverdue() const
     {
         return deadline < QDateTime::currentDateTime() && !completed;
+    }
+
+    bool hasCompletionTime() const
+    {
+        return completed && completedAt.isValid();
     }
 };
 

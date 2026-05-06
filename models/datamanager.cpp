@@ -117,6 +117,11 @@ void DataManager::markTaskCompleted(int index, bool completed)
 {
     if (index >= 0 && index < m_tasks.size()) {
         m_tasks[index].completed = completed;
+        if (completed && !m_tasks[index].completedAt.isValid()) {
+            m_tasks[index].completedAt = QDateTime::currentDateTime();
+        } else if (!completed) {
+            m_tasks[index].completedAt = QDateTime();
+        }
         emit tasksChanged();
         saveTasks();
     }
@@ -205,6 +210,7 @@ bool DataManager::loadTasks()
             }
             task.priority = obj["priority"].toInt();
             task.completed = obj["completed"].toBool();
+            task.completedAt = QDateTime::fromString(obj["completedAt"].toString(), Qt::ISODate);
             m_tasks.append(task);
         }
     }
@@ -235,6 +241,9 @@ bool DataManager::saveTasks()
         obj["deadline"] = task.deadline.toString(Qt::ISODate);
         obj["priority"] = task.priority;
         obj["completed"] = task.completed;
+        if (task.completedAt.isValid()) {
+            obj["completedAt"] = task.completedAt.toString(Qt::ISODate);
+        }
         arr.append(obj);
     }
     
