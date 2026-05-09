@@ -11,6 +11,7 @@
 TopbarWidget::TopbarWidget(QWidget *parent)
     : QWidget(parent)
     , searchPopup(nullptr)
+    , searchTimer(new QTimer(this))
 {
     setFixedHeight(50);
     setStyleSheet("background:#F7F3EF;");
@@ -45,11 +46,15 @@ TopbarWidget::TopbarWidget(QWidget *parent)
 
     searchPopup = new SearchPopup(this);
 
+    searchTimer->setSingleShot(true);
+    searchTimer->setInterval(150);
+
     connect(searchEdit, &QLineEdit::textChanged, this, &TopbarWidget::onSearchTextChanged);
     connect(searchEdit, &QLineEdit::returnPressed, this, &TopbarWidget::onSearchReturned);
     connect(searchPopup, &SearchPopup::courseSelected, this, &TopbarWidget::onCourseSelected);
     connect(searchPopup, &SearchPopup::taskSelected, this, &TopbarWidget::onTaskSelected);
     connect(searchPopup, &SearchPopup::fileSelected, this, &TopbarWidget::onFileSelected);
+    connect(searchTimer, &QTimer::timeout, this, &TopbarWidget::doSearch);
 
     layout->addWidget(title);
     layout->addStretch();
@@ -66,6 +71,20 @@ QLineEdit* TopbarWidget::getSearchEdit() const {
 
 void TopbarWidget::onSearchTextChanged(const QString& text)
 {
+    currentSearchText = text;
+    if (text.trimmed().isEmpty()) {
+        searchTimer->stop();
+        searchPopup->hide();
+        return;
+    }
+
+    searchTimer->stop();
+    searchTimer->start();
+}
+
+void TopbarWidget::doSearch()
+{
+    const QString& text = currentSearchText;
     if (text.trimmed().isEmpty()) {
         searchPopup->hide();
         return;

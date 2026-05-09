@@ -11,10 +11,11 @@
 #include <QUrl>
 
 SearchPopup::SearchPopup(QWidget* parent)
-    : QWidget(parent, Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint)
+    : QWidget(nullptr, Qt::Window | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint)
 {
     setAttribute(Qt::WA_TranslucentBackground);
-    setWindowFlags(Qt::FramelessWindowHint);
+    setAttribute(Qt::WA_ShowWithoutActivating);
+    setWindowFlags(windowFlags() | Qt::Tool);
 
     QFrame* container = new QFrame(this);
     container->setStyleSheet("QFrame { background: white; border-radius: 16px; }");

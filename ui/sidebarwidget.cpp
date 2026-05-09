@@ -34,50 +34,49 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     subtitle->setStyleSheet("color: rgba(255,255,255,0.85); font-size: 12px; padding-left: 4px;");
     layout->addWidget(subtitle);
 
-    QPushButton *btnDashboard = new QPushButton("课程表");
-    QPushButton *btnTodo = new QPushButton("待办");
-    QPushButton *btnStats = new QPushButton("📊 统计");
+    btnDashboard = new QPushButton("课程表");
+    btnTodo = new QPushButton("待办");
+    btnStats = new QPushButton("📊 统计");
+    btnSettings = new QPushButton("⚙ 设置");
 
-        QString buttonStyle = QString(R"(
-            QPushButton {
-                background: %1;
-                color: %2;
-                border: 1px solid transparent;
-                border-radius: 14px;
-                padding: 14px 16px;
-                min-height: 44px;
-                text-align: left;
-                font-size: 14px;
-                font-weight: 600;
-            }
-            QPushButton:hover {
-                background: %3;
-                color: %2;
-            }
-            QPushButton:pressed {
-                background: %4;
-                color: %2;
-            }
-            QPushButton:checked {
-                background: %2;
-                color: white;
-                border: 1px solid %2;
-            }
-        )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY).arg("#FFD7DA").arg("#FFCDD2");
+    QString buttonStyle = QString(R"(
+        QPushButton {
+            background: %1;
+            color: %2;
+            border: 1px solid transparent;
+            border-radius: 14px;
+            padding: 14px 16px;
+            min-height: 44px;
+            text-align: left;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %3;
+            color: %2;
+        }
+        QPushButton:pressed {
+            background: %4;
+            color: %2;
+        }
+        QPushButton:checked {
+            background: %2;
+            color: white;
+            border: 1px solid %2;
+        }
+    )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY).arg("#FFD7DA").arg("#FFCDD2");
     btnDashboard->setStyleSheet(buttonStyle);
     btnTodo->setStyleSheet(buttonStyle);
     btnStats->setStyleSheet(buttonStyle);
+    btnSettings->setStyleSheet(buttonStyle);
     btnDashboard->setCheckable(true);
     btnTodo->setCheckable(true);
     btnStats->setCheckable(true);
+    btnSettings->setCheckable(true);
     btnDashboard->setChecked(true);
     btnDashboard->setCursor(Qt::PointingHandCursor);
     btnTodo->setCursor(Qt::PointingHandCursor);
     btnStats->setCursor(Qt::PointingHandCursor);
-
-    QPushButton *btnSettings = new QPushButton("⚙ 设置");
-    btnSettings->setStyleSheet(buttonStyle);
-    btnSettings->setCheckable(true);
     btnSettings->setCursor(Qt::PointingHandCursor);
 
     layout->addWidget(btnDashboard);
@@ -133,6 +132,7 @@ layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
         btnTodo->setChecked(true);
         btnDashboard->setChecked(false);
         btnStats->setChecked(false);
+        btnSettings->setChecked(false);
         emit pageChanged(1);
     });
 
@@ -182,4 +182,12 @@ void SidebarWidget::mousePressEvent(QMouseEvent *event)
         return;
     }
     QWidget::mousePressEvent(event);
+}
+
+void SidebarWidget::setActivePage(int index)
+{
+    btnDashboard->setChecked(index == 0);
+    btnTodo->setChecked(index == 1);
+    btnStats->setChecked(index == 2);
+    btnSettings->setChecked(index == 3);
 }

@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QLineEdit>
+#include <QTimer>
 #include "../widgets/search/searchpopup.h"
 
 class TopbarWidget : public QWidget
@@ -13,7 +14,7 @@ public:
     explicit TopbarWidget(QWidget *parent = nullptr);
     ~TopbarWidget();
 
-signals:
+ signals:
     void searchCourseRequested(const QString& courseName);
     void searchTaskRequested(int taskIndex);
     void fileSelected(const QString& filePath);
@@ -27,12 +28,15 @@ private slots:
     void onCourseSelected(const QString& courseName);
     void onTaskSelected(int taskIndex);
     void onFileSelected(const QString& filePath);
+    void doSearch();
 
 private:
     void positionPopup();
 
     QLineEdit *searchEdit;
     SearchPopup *searchPopup;
+    QTimer *searchTimer;
+    QString currentSearchText;
 };
 
 #endif

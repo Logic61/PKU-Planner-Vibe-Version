@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QEvent>
 #include <QLabel>
+#include <QPushButton>
 #include "../models/mascotstate.h"
 
 class SidebarWidget : public QWidget
@@ -19,6 +20,7 @@ signals:
 
 public slots:
     void onMascotClicked() { emit mascotClicked(); }
+    void setActivePage(int index);
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
@@ -26,6 +28,10 @@ protected:
 
 private:
     QLabel *mascotLabel = nullptr;
+    QPushButton *btnDashboard = nullptr;
+    QPushButton *btnTodo = nullptr;
+    QPushButton *btnStats = nullptr;
+    QPushButton *btnSettings = nullptr;
 };
 
 #endif

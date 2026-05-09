@@ -224,6 +224,9 @@ void MainWindow::onSearchCourseRequested(const QString& courseName)
 void MainWindow::onSearchTaskRequested(int taskIndex)
 {
     PageAnimator::slideToIndex(stack, 1);
+    if (sidebar) {
+        sidebar->setActivePage(1);
+    }
     if (todoPage) {
         QMetaObject::invokeMethod(todoPage, "highlightTask", Qt::QueuedConnection, Q_ARG(int, taskIndex));
     }
