@@ -24,6 +24,7 @@ private:
     QCheckBox *reminderCheck;
     QComboBox *reminderInterval;
     QPushButton *exportBtn;
+    QPushButton *importBtn;
     QLabel *statusLabel;
 
     QLabel *semesterNameLabel;
@@ -41,7 +42,13 @@ private:
 
     void loadSettings();
     void saveSettings();
+    void importSchedule();
     void exportToCSV();
+    void openDocs();
+    void backupData();
+    void resetGuide();
+    void factoryReset();
+    void openFeedback();
     void openDataFolder();
     void clearAllData();
     void editSemester();

@@ -1,6 +1,8 @@
 #include "settingspage.h"
 #include "../ui/theme.h"
 #include "../models/datamanager.h"
+#include "../models/course.h"
+#include "../models/task.h"
 #include "../services/configservice.h"
 #include "../dialogs/confirmdialog.h"
 #include "../components/toastwidget.h"
@@ -17,6 +19,10 @@
 #include <QDateEdit>
 #include <QDir>
 #include <QCoreApplication>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QTextEdit>
 
 SettingsPage::SettingsPage(QWidget *parent)
     : QWidget(parent)
@@ -426,9 +432,9 @@ QFrame* SettingsPage::createDataCard()
     btnGrid->setColumnStretch(0, 1);
     btnGrid->setColumnStretch(1, 1);
 
-    exportBtn = new QPushButton("📤 导出报告", this);
-    exportBtn->setCursor(Qt::PointingHandCursor);
-    exportBtn->setStyleSheet(QString(
+    importBtn = new QPushButton("📥 导入课表", this);
+    importBtn->setCursor(Qt::PointingHandCursor);
+    importBtn->setStyleSheet(QString(
         "QPushButton{"
         "background:%1;"
         "color:white;"
@@ -442,8 +448,27 @@ QFrame* SettingsPage::createDataCard()
         "background:%2;"
         "}"
     ).arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+    connect(importBtn, &QPushButton::clicked, this, &SettingsPage::importSchedule);
+    btnGrid->addWidget(importBtn, 0, 0);
+
+    exportBtn = new QPushButton("📤 导出报告", this);
+    exportBtn->setCursor(Qt::PointingHandCursor);
+    exportBtn->setStyleSheet(QString(
+        "QPushButton{"
+        "background:%1;"
+        "color:%2;"
+        "border:none;"
+        "border-radius:14px;"
+        "padding:16px 12px;"
+        "font-size:14px;"
+        "font-weight:500;"
+        "}"
+        "QPushButton:hover{"
+        "background:%3;"
+        "}"
+    ).arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY).arg(Theme::PRIMARY_LIGHTER));
     connect(exportBtn, &QPushButton::clicked, this, &SettingsPage::exportToCSV);
-    btnGrid->addWidget(exportBtn, 0, 0);
+    btnGrid->addWidget(exportBtn, 0, 1);
 
     QPushButton *openFolderBtn = new QPushButton("📁 打开目录", this);
     openFolderBtn->setCursor(Qt::PointingHandCursor);
@@ -480,6 +505,7 @@ QFrame* SettingsPage::createDataCard()
         "background:%3;"
         "}"
     ).arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY).arg(Theme::PRIMARY_LIGHTER));
+    connect(resetGuideBtn, &QPushButton::clicked, this, &SettingsPage::resetGuide);
     btnGrid->addWidget(resetGuideBtn, 1, 0);
 
     QPushButton *backupBtn = new QPushButton("💿 备份数据", this);
@@ -498,6 +524,7 @@ QFrame* SettingsPage::createDataCard()
         "background:%3;"
         "}"
     ).arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY).arg(Theme::PRIMARY_LIGHTER));
+    connect(backupBtn, &QPushButton::clicked, this, &SettingsPage::backupData);
     btnGrid->addWidget(backupBtn, 1, 1);
 
     v->addLayout(btnGrid);
@@ -561,6 +588,7 @@ QFrame* SettingsPage::createDataCard()
         "color:white;"
         "}"
     ).arg(Theme::DANGER));
+    connect(resetAllBtn, &QPushButton::clicked, this, &SettingsPage::factoryReset);
     dangerBtns->addWidget(resetAllBtn);
     dangerV->addLayout(dangerBtns);
 
@@ -677,6 +705,7 @@ QFrame* SettingsPage::createAboutCard()
         "background:%3;"
         "}"
     ).arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY).arg(Theme::PRIMARY_LIGHTER));
+    connect(docsBtn, &QPushButton::clicked, this, &SettingsPage::openDocs);
     linkRow->addWidget(docsBtn);
 
     QPushButton *feedbackBtn = new QPushButton("💬 反馈", this);
@@ -695,6 +724,7 @@ QFrame* SettingsPage::createAboutCard()
         "background:%3;"
         "}"
     ).arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY).arg(Theme::PRIMARY_LIGHTER));
+    connect(feedbackBtn, &QPushButton::clicked, this, &SettingsPage::openFeedback);
     linkRow->addWidget(feedbackBtn);
 
     v->addLayout(linkRow);
@@ -922,6 +952,189 @@ void SettingsPage::editSemester()
     updateSemesterDisplay();
 }
 
+void SettingsPage::openDocs()
+{
+    QString appPath = QCoreApplication::applicationDirPath();
+    QString readmePath = QDir(appPath).absoluteFilePath("README.md");
+
+    if (!QFile::exists(readmePath)) {
+        readmePath = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("..") + "/README.md";
+    }
+    if (!QFile::exists(readmePath)) {
+        readmePath = QCoreApplication::applicationDirPath() + "/README.md";
+    }
+
+    if (QFile::exists(readmePath)) {
+        QDesktopServices::openUrl(QUrl::fromLocalFile(readmePath));
+    } else {
+        QMessageBox::information(this, "提示", "使用说明文档未找到，请访问项目主页获取帮助");
+    }
+}
+
+void SettingsPage::backupData()
+{
+    QString defaultName = QDateTime::currentDateTime().toString("yyyyMMdd_hhmmss") + "_backup";
+    QString fileName = QFileDialog::getSaveFileName(this, "备份数据",
+        defaultName,
+        "JSON Files (*.json)");
+
+    if (fileName.isEmpty()) return;
+
+    QJsonObject root;
+
+    QJsonArray coursesArray;
+    for (const Course& c : DataManager::instance().courses()) {
+        coursesArray.append(c.toJson());
+    }
+    root["courses"] = coursesArray;
+
+    QJsonArray tasksArray;
+    for (const Task& t : DataManager::instance().tasks()) {
+        tasksArray.append(t.toJson());
+    }
+    root["tasks"] = tasksArray;
+
+    QJsonDocument doc(root);
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly)) {
+        QMessageBox::warning(this, "备份失败", "无法创建备份文件");
+        return;
+    }
+    file.write(doc.toJson(QJsonDocument::Indented));
+    file.close();
+
+    ToastWidget::showToast(this, "数据已备份到: " + fileName, 3000);
+}
+
+void SettingsPage::resetGuide()
+{
+    if (!ConfirmDialog::confirm(
+        this,
+        "重置引导",
+        "确定要重置引导吗？\n下次启动应用时将重新显示欢迎页面。",
+        "重置"
+    )) {
+        return;
+    }
+
+    ConfigService::instance().resetOnboarding();
+    ToastWidget::showToast(this, "引导已重置，重启应用后将显示欢迎页面", 3000);
+}
+
+void SettingsPage::factoryReset()
+{
+    if (!ConfirmDialog::confirm(
+        this,
+        "恢复出厂设置",
+        "确定要恢复出厂设置吗？\n此操作将清空所有数据并重置应用设置。\n此操作不可恢复！",
+        "恢复",
+        true
+    )) {
+        return;
+    }
+
+    QString dataPath = QCoreApplication::instance()
+        ? QCoreApplication::applicationDirPath()
+        : QDir::currentPath();
+    QFile coursesFile(QDir(dataPath).absoluteFilePath("courses.json"));
+    QFile tasksFile(QDir(dataPath).absoluteFilePath("tasks.json"));
+    coursesFile.remove();
+    tasksFile.remove();
+
+    ConfigService::instance().resetAllData();
+    ConfigService::instance().resetOnboarding();
+
+    ToastWidget::showToast(this, "已恢复出厂设置，请重启应用", 4000);
+}
+
+void SettingsPage::openFeedback()
+{
+    QDialog *dialog = new QDialog(this);
+    dialog->setWindowTitle("反馈");
+    dialog->setMinimumWidth(450);
+
+    QVBoxLayout *v = new QVBoxLayout(dialog);
+    v->setSpacing(16);
+
+    QLabel *title = new QLabel("提交反馈", dialog);
+    title->setStyleSheet("font-size:18px;font-weight:600;");
+    v->addWidget(title);
+
+    QLabel *hint = new QLabel("请描述您遇到的问题或建议：", dialog);
+    hint->setStyleSheet("font-size:14px;color:#666;");
+    v->addWidget(hint);
+
+    QTextEdit *feedbackEdit = new QTextEdit(dialog);
+    feedbackEdit->setPlaceholderText("在这里输入您的反馈...");
+    feedbackEdit->setMinimumHeight(150);
+    feedbackEdit->setStyleSheet(R"(
+        QTextEdit {
+            border:1px solid #DDD;
+            border-radius:8px;
+            padding:12px;
+            font-size:14px;
+        }
+    )");
+    v->addWidget(feedbackEdit);
+
+    v->addSpacing(8);
+
+    QHBoxLayout *btnRow = new QHBoxLayout;
+    btnRow->addStretch();
+
+    QPushButton *cancelBtn = new QPushButton("取消", dialog);
+    cancelBtn->setStyleSheet(R"(
+        QPushButton {
+            background:white;
+            color:#666;
+            border:1px solid #DDD;
+            border-radius:12px;
+            padding:12px 24px;
+            font-size:14px;
+        }
+        QPushButton:hover {background:#F5F5F5;}
+    )");
+    connect(cancelBtn, &QPushButton::clicked, dialog, &QDialog::reject);
+    btnRow->addWidget(cancelBtn);
+
+    QPushButton *submitBtn = new QPushButton("提交", dialog);
+    submitBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background:%1;
+            color:white;
+            border:none;
+            border-radius:12px;
+            padding:12px 24px;
+            font-size:14px;
+            font-weight:600;
+        }
+        QPushButton:hover {background:%2;}
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+    connect(submitBtn, &QPushButton::clicked, [=]() {
+        QString feedback = feedbackEdit->toPlainText().trimmed();
+        if (feedback.isEmpty()) {
+            QMessageBox::warning(dialog, "提示", "请输入反馈内容");
+            return;
+        }
+        QFile feedbackFile(QCoreApplication::applicationDirPath() + "/feedback.txt");
+        if (feedbackFile.open(QIODevice::Append | QIODevice::Text)) {
+            QTextStream out(&feedbackFile);
+            out << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
+            out << feedback << "\n";
+            out << "---\n";
+            feedbackFile.close();
+        }
+        ToastWidget::showToast(this, "感谢您的反馈！", 3000);
+        dialog->accept();
+    });
+    btnRow->addWidget(submitBtn);
+
+    v->addLayout(btnRow);
+
+    dialog->exec();
+    delete dialog;
+}
+
 void SettingsPage::updateSemesterDisplay()
 {
     QDate startDate = ConfigService::instance().getSemesterStart();
@@ -939,4 +1152,149 @@ void SettingsPage::updateSemesterDisplay()
     progressBar->setValue(progress);
     weeksLeftLabel->setText(QString("%1周剩余").arg(qMax(0, totalWeeks - currentWeek)));
     singleWeekLabel->setText(isSingle ? "单周" : "双周");
+}
+
+int parseDayOfWeek(const QString& dayStr) {
+    QMap<QString, int> dayMap = {
+        {"周一", 1}, {"1", 1}, {"星期一", 1},
+        {"周二", 2}, {"2", 2}, {"星期二", 2},
+        {"周三", 3}, {"3", 3}, {"星期三", 3},
+        {"周四", 4}, {"4", 4}, {"星期四", 4},
+        {"周五", 5}, {"5", 5}, {"星期五", 5},
+        {"周六", 6}, {"6", 6}, {"星期六", 6},
+        {"周日", 7}, {"7", 7}, {"星期日", 7}, {"周日", 7}
+    };
+    return dayMap.value(dayStr.trimmed(), 1);
+}
+
+QPair<int, int> parsePeriod(const QString& periodStr) {
+    QRegularExpression re("(\\d+)-(\\d+)");
+    QRegularExpressionMatch match = re.match(periodStr);
+    if (match.hasMatch()) {
+        return qMakePair(match.captured(1).toInt(), match.captured(2).toInt());
+    }
+    QRegularExpression singleRe("(\\d+)");
+    QRegularExpressionMatch singleMatch = singleRe.match(periodStr);
+    if (singleMatch.hasMatch()) {
+        int p = singleMatch.captured(1).toInt();
+        return qMakePair(p, p);
+    }
+    return qMakePair(1, 2);
+}
+
+int parseWeekType(const QString& weekStr) {
+    if (weekStr.contains("单")) return 1;
+    if (weekStr.contains("双")) return 2;
+    return 0;
+}
+
+void SettingsPage::importSchedule()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "导入课表",
+        QString(),
+        "课表文件 (*.txt *.csv *.json);;所有文件 (*)");
+
+    if (fileName.isEmpty()) return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "导入失败", "无法读取文件");
+        return;
+    }
+
+    QTextStream in(&file);
+    QString content = in.readAll();
+    file.close();
+
+    QList<Course> importedCourses;
+
+    if (fileName.endsWith(".json")) {
+        QJsonDocument doc = QJsonDocument::fromJson(content.toUtf8());
+        if (doc.isArray()) {
+            QJsonArray arr = doc.array();
+            for (int i = 0; i < arr.size(); ++i) {
+                QJsonObject obj = arr[i].toObject();
+                Course c;
+                c.name = obj["name"].toString();
+                c.teacher = obj["teacher"].toString();
+                c.location = obj["location"].toString();
+                c.day = obj["day"].toInt(1);
+                c.startPeriod = obj["startPeriod"].toInt(1);
+                c.endPeriod = obj["endPeriod"].toInt(2);
+                c.weekType = obj["weekType"].toInt(0);
+                if (!c.name.isEmpty()) {
+                    importedCourses.append(c);
+                }
+            }
+        } else if (doc.isObject()) {
+            QJsonObject root = doc.object();
+            if (root.contains("courses") && root["courses"].isArray()) {
+                QJsonArray arr = root["courses"].toArray();
+                for (int i = 0; i < arr.size(); ++i) {
+                    QJsonObject obj = arr[i].toObject();
+                    Course c;
+                    c.name = obj["name"].toString();
+                    c.teacher = obj["teacher"].toString();
+                    c.location = obj["location"].toString();
+                    c.day = obj["day"].toInt(1);
+                    c.startPeriod = obj["startPeriod"].toInt(1);
+                    c.endPeriod = obj["endPeriod"].toInt(2);
+                    c.weekType = obj["weekType"].toInt(0);
+                    if (!c.name.isEmpty()) {
+                        importedCourses.append(c);
+                    }
+                }
+            }
+        }
+    } else {
+        QStringList lines = content.split("\n", Qt::SkipEmptyParts);
+        for (const QString& line : lines) {
+            QString trimmed = line.trimmed();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+
+            QStringList parts;
+            if (trimmed.contains(",")) {
+                parts = trimmed.split(",");
+            } else if (trimmed.contains("\t")) {
+                parts = trimmed.split("\t");
+            } else if (trimmed.contains(";")) {
+                parts = trimmed.split(";");
+            } else {
+                continue;
+            }
+
+            if (parts.size() < 3) continue;
+
+            Course c;
+            c.name = parts[0].trimmed();
+            c.teacher = parts.size() > 1 ? parts[1].trimmed() : "";
+
+            QString timeStr = parts.size() > 2 ? parts[2].trimmed() : "";
+            c.day = parseDayOfWeek(timeStr);
+            QPair<int, int> period = parsePeriod(timeStr);
+            c.startPeriod = period.first;
+            c.endPeriod = period.second;
+
+            c.location = parts.size() > 3 ? parts[3].trimmed() : "";
+            c.weekType = parts.size() > 4 ? parseWeekType(parts[4].trimmed()) : 0;
+
+            if (!c.name.isEmpty()) {
+                importedCourses.append(c);
+            }
+        }
+    }
+
+    if (importedCourses.isEmpty()) {
+        QMessageBox::warning(this, "导入失败", "未找到有效的课程数据\n请检查文件格式是否正确");
+        return;
+    }
+
+    for (const Course& c : importedCourses) {
+        DataManager::instance().addCourse(c);
+    }
+    DataManager::instance().save();
+
+    ToastWidget::showToast(this, QString("成功导入 %1 门课程").arg(importedCourses.size()), 3000);
+
+    emit DataManager::instance().coursesChanged();
 }

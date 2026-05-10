@@ -103,19 +103,32 @@ void SearchPopup::addSection(const QString& title, const QString& icon, const QV
     for (const SearchResult& r : items) {
         ClickableFrame* item = new ClickableFrame(section);
         item->setCursor(Qt::PointingHandCursor);
-        item->setStyleSheet(QString(R"(
+        QString normalStylesheet = QString(R"(
             QFrame {
                 background: %1;
                 border-radius: 10px;
                 padding: 10px 12px;
             }
-            QFrame[hovered="true"] {
-                background: %2;
+            QLabel {
+                color: %3;
             }
-            QFrame[hovered="true"] QLabel {
+        )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY).arg("#222222");
+
+        QString hoverStylesheet = QString(R"(
+            QFrame {
+                background: %1;
+                border-radius: 10px;
+                padding: 10px 12px;
+            }
+            QLabel {
                 color: white;
             }
-        )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY));
+        )").arg(Theme::PRIMARY);
+
+        item->setStyleSheet(normalStylesheet);
+
+        item->installEventFilter(this);
+        item->setProperty("hoverStylesheet", hoverStylesheet);
         
 connect(item, &ClickableFrame::clicked, this, [this, r]() {
             if (r.type == SearchResult::Course) emit courseSelected(r.id);
@@ -176,4 +189,33 @@ void SearchPopup::clearResults()
         }
         delete item;
     }
+}
+
+bool SearchPopup::eventFilter(QObject* obj, QEvent* event)
+{
+    if (event->type() == QEvent::Enter) {
+        QFrame* frame = qobject_cast<QFrame*>(obj);
+        if (frame) {
+            QString hoverStylesheet = frame->property("hoverStylesheet").toString();
+            if (!hoverStylesheet.isEmpty()) {
+                frame->setStyleSheet(hoverStylesheet);
+            }
+        }
+    } else if (event->type() == QEvent::Leave) {
+        QFrame* frame = qobject_cast<QFrame*>(obj);
+        if (frame) {
+            QString normalStylesheet = QString(R"(
+                QFrame {
+                    background: %1;
+                    border-radius: 10px;
+                    padding: 10px 12px;
+                }
+                QLabel {
+                    color: #222222;
+                }
+            )").arg(Theme::PRIMARY_LIGHTER);
+            frame->setStyleSheet(normalStylesheet);
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }

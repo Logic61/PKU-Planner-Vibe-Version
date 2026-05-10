@@ -12,10 +12,14 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# 为MSVC添加 /Zc:__cplusplus 选项
+# 为MSVC添加编译选项 - Qt6需要/permissive-
 if(MSVC)
-    add_compile_options(/Zc:__cplusplus)
+    add_compile_options(/permissive- /Zc:__cplusplus /utf-8)
 endif()
+
+# 确保C++标准符合Qt6要求
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets)
 

@@ -4,6 +4,7 @@
 #include <QWidget>
 #include <QVector>
 #include <QMouseEvent>
+#include <QEvent>
 #include <QFrame>
 #include "../../services/searchservice.h"
 
@@ -49,6 +50,7 @@ private:
     void addSection(const QString& title, const QString& icon, const QVector<SearchResult>& items, const QString& keyword);
     void clearResults();
     QString highlightText(const QString& text, const QString& keyword);
+    bool eventFilter(QObject* obj, QEvent* event) override;
     QVBoxLayout* resultsLayout;
     QWidget* contentWidget;
     QString currentKeyword;
