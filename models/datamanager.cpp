@@ -75,18 +75,23 @@ void DataManager::deleteCourse(int index)
 {
     if (index >= 0 && index < m_courses.size()) {
         QString courseName = m_courses[index].name;
+        qDebug() << "[DataManager] Deleting course:" << courseName << "at index:" << index;
         m_courses.removeAt(index);
         
+        int removedTasks = 0;
         for (int i = m_tasks.size() - 1; i >= 0; --i) {
             if (m_tasks[i].course == courseName) {
                 m_tasks.removeAt(i);
+                removedTasks++;
             }
         }
+        qDebug() << "[DataManager] Removed" << removedTasks << "associated tasks";
         
+        save();
         emit coursesChanged();
         emit tasksChanged();
-        saveCourses();
-        saveTasks();
+    } else {
+        qWarning() << "[DataManager] Attempted to delete invalid index:" << index;
     }
 }
 

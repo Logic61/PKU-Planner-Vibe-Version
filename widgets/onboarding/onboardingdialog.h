@@ -2,10 +2,7 @@
 #define ONBOARDINGDIALOG_H
 
 #include <QDialog>
-#include <QDialogButtonBox>
-#include <QVBoxLayout>
-#include <QLabel>
-#include <QPushButton>
+#include <QMouseEvent>
 
 class OnboardingDialog : public QDialog
 {
@@ -14,8 +11,8 @@ class OnboardingDialog : public QDialog
 public:
     explicit OnboardingDialog(QWidget *parent = nullptr);
 
-signals:
-    void createFirstCourseRequested();
+protected:
+    void mousePressEvent(QMouseEvent *event) override;
 
 private:
     void setupUI();

@@ -17,21 +17,42 @@
 #include <QVector>
 #include <QScrollArea>
 #include <QPushButton>
+#include <QGraphicsOpacityEffect>
+#include <QEnterEvent>
+#include <QMouseEvent>
+#include <QEvent>
 #include <algorithm>
+#include <QDebug>
 
 namespace {
-QFrame* makeCard(const QString &title, const QString &value) {
+QFrame* makeCard(const QString &icon, const QString &title, const QString &value) {
     QFrame *card = new QFrame;
-    card->setStyleSheet("QFrame{background:white;border-radius:20px;padding:18px;}");
+    card->setMinimumHeight(120);
+    card->setStyleSheet("QFrame{background:white;border-radius:20px;}");
+    
     QVBoxLayout *l = new QVBoxLayout(card);
-    QLabel *t = new QLabel(title);
-    t->setObjectName("title");
-    t->setStyleSheet("color:#666;font-size:12px;");
-    QLabel *v = new QLabel(value);
+    l->setContentsMargins(10, 10, 10, 10);
+    l->setSpacing(4);
+    l->addStretch();
+
+    QLabel *i = new QLabel(icon, card);
+    i->setStyleSheet("font-size:24px; color:#222; background:transparent;");
+    i->setAlignment(Qt::AlignCenter);
+    l->addWidget(i);
+
+    QLabel *v = new QLabel(value, card);
     v->setObjectName("value");
-    v->setStyleSheet("font-size:20px;font-weight:700;color:#222;");
-    l->addWidget(t);
+    v->setStyleSheet("font-size:32px; font-weight:700; color:#222; background:transparent;");
+    v->setAlignment(Qt::AlignCenter);
     l->addWidget(v);
+
+    QLabel *t = new QLabel(title, card);
+    t->setObjectName("title");
+    t->setStyleSheet("font-size:14px; color:#888; background:transparent;");
+    t->setAlignment(Qt::AlignCenter);
+    l->addWidget(t);
+
+    l->addStretch();
     return card;
 }
 
@@ -104,37 +125,27 @@ StatsPage::StatsPage(QWidget *parent)
     // 四个统计卡片
     QHBoxLayout *cards = new QHBoxLayout;
     cards->setSpacing(12);
-    cardTotal = makeCard("任务总数", "0");
-    cardDone = makeCard("已完成率", "0%");
-    cardOnTime = makeCard("按时完成率", "0%");
-    cardAvg = makeCard("平均提前时间", "0 天");
+    cardTotal = makeCard("📋", "任务总数", "0");
+    cardTotal->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    cardDone = makeCard("✅", "已完成率", "0%");
+    cardDone->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    cardOnTime = makeCard("⏰", "按时完成率", "0%");
+    cardOnTime->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    cardAvg = makeCard("📅", "平均提前", "0 天");
+    cardAvg->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     cards->addWidget(cardTotal,1);
     cards->addWidget(cardDone,1);
     cards->addWidget(cardOnTime,1);
     cards->addWidget(cardAvg,1);
     root->addLayout(cards);
 
-    // 课程任务数量排行（进度条）
-    QFrame *rankCard = new QFrame;
-    rankCard->setStyleSheet("QFrame{background:white;border-radius:20px;padding:16px;}");
-    QVBoxLayout *rankLayout = new QVBoxLayout(rankCard);
-    QLabel *rankTitle = new QLabel("课程任务数量排行");
-    rankTitle->setStyleSheet("font-weight:700;color:#222;margin-bottom:8px;");
-    rankLayout->addWidget(rankTitle);
-    rankContainer = new QVBoxLayout;
-    rankContainer->setSpacing(8);
-    rankLayout->addLayout(rankContainer);
-    root->addWidget(rankCard);
-
     // 热力日历（本月）
     QFrame *heatCard = new QFrame;
-    heatCard->setStyleSheet("QFrame{background:white;border-radius:20px;padding:16px;}");
+    heatCard->setStyleSheet("QFrame{background:white;border-radius:20px;padding:20px;}");
     QVBoxLayout *heatLayout = new QVBoxLayout(heatCard);
-    QLabel *heatTitle = new QLabel("本月 DDL 热力图");
-    heatTitle->setStyleSheet("font-weight:700;color:#222;margin-bottom:8px;");
-    heatLayout->addWidget(heatTitle);
+    heatLayout->setSpacing(16);
     heatGrid = new QGridLayout;
-    heatGrid->setSpacing(4);
+    heatGrid->setSpacing(8);
     heatLayout->addLayout(heatGrid);
     root->addWidget(heatCard);
 
@@ -150,11 +161,11 @@ StatsPage::StatsPage(QWidget *parent)
     trendLayout->addLayout(trendContainer);
     root->addWidget(trendCard);
 
-    // 智能建议
+    // 课程任务数量排行
     QFrame *suggestCard = new QFrame;
     suggestCard->setStyleSheet("QFrame{background:white;border-radius:20px;padding:16px;}");
     QVBoxLayout *suggestLayout = new QVBoxLayout(suggestCard);
-    QLabel *suggestTitle = new QLabel("智能建议");
+    QLabel *suggestTitle = new QLabel("课程任务数量排行");
     suggestTitle->setStyleSheet("font-weight:700;color:#222;margin-bottom:8px;");
     suggestLayout->addWidget(suggestTitle);
     suggestContainer = new QVBoxLayout;
@@ -194,7 +205,7 @@ void StatsPage::refresh()
     }
 
     updateSummary(tasks);
-    updateRanking(tasks);
+    
     updateHeatmap(tasks);
     updateTrend(tasks);
     updateSuggestions(tasks, courses);
@@ -215,10 +226,13 @@ void StatsPage::updateEmptyState()
     if (onTimeVal) onTimeVal->setText("0%");
     if (avgVal) avgVal->setText("0 天");
 
-    clearLayout(rankContainer);
     clearLayout(heatGrid);
     clearLayout(trendContainer);
     clearLayout(suggestContainer);
+
+    QLabel* empty = new QLabel("暂无任务");
+    empty->setStyleSheet("color:#999;font-size:12px;padding:16px;");
+    suggestContainer->addWidget(empty);
 }
 
 void StatsPage::clearLayout(QLayout* layout)
@@ -270,128 +284,201 @@ void StatsPage::updateSummary(const QList<Task>& tasks)
     if (avgVal) avgVal->setText(QString::number(qRound(avgEarly)) + " 天");
 }
 
-void StatsPage::updateRanking(const QList<Task>& tasks)
-{
-    clearLayout(rankContainer);
 
-    QMap<QString, int> counter;
-    for (const Task& t : tasks) {
-        if (!t.completed) {
-            counter[t.course]++;
-        }
-    }
-
-    QVector<QPair<QString, int>> sorted;
-    for (auto it = counter.begin(); it != counter.end(); ++it) {
-        sorted.append(qMakePair(it.key(), it.value()));
-    }
-    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
-        return a.second > b.second;
-    });
-
-    int maxCount = sorted.isEmpty() ? 1 : sorted.first().second;
-
-    for (const auto& pair : sorted) {
-        QFrame* row = new QFrame;
-        row->setStyleSheet("background:#FEFEFE;border-radius:8px;padding:8px;");
-
-        QHBoxLayout* rowLayout = new QHBoxLayout(row);
-        rowLayout->setContentsMargins(8,4,8,4);
-
-        QLabel* name = new QLabel(pair.first);
-        name->setStyleSheet("color:#333;font-size:12px;font-weight:500;min-width:80px;");
-        rowLayout->addWidget(name);
-
-        QProgressBar* bar = new QProgressBar;
-        bar->setRange(0, maxCount);
-        bar->setValue(pair.second);
-        bar->setStyleSheet(QString(R"(
-            QProgressBar {
-                border: none;
-                background: %1;
-                border-radius: 4px;
-                height: 8px;
-            }
-            QProgressBar::chunk {
-                background: %2;
-                border-radius: 4px;
-            }
-        )").arg(Theme::BORDER).arg(Theme::PRIMARY));
-        bar->setTextVisible(false);
-        rowLayout->addWidget(bar, 1);
-
-        QLabel* count = new QLabel(QString::number(pair.second));
-        count->setStyleSheet(QString("color:%1;font-size:12px;font-weight:600;min-width:24px;").arg(Theme::PRIMARY));
-        count->setAlignment(Qt::AlignRight);
-        rowLayout->addWidget(count);
-
-        rankContainer->addWidget(row);
-    }
-
-    if (sorted.isEmpty()) {
-        QLabel* empty = new QLabel("暂无未完成任务");
-        empty->setStyleSheet("color:#999;font-size:12px;padding:8px;");
-        rankContainer->addWidget(empty);
-    }
-}
 
 void StatsPage::updateHeatmap(const QList<Task>& tasks)
 {
     clearLayout(heatGrid);
 
-    QDate today = QDate::currentDate();
-    QDate firstDayOfMonth(today.year(), today.month(), 1);
+    if (!currentMonth.isValid()) {
+        currentMonth = QDate::currentDate();
+    }
+    QDate firstDayOfMonth(currentMonth.year(), currentMonth.month(), 1);
     int daysInMonth = firstDayOfMonth.daysInMonth();
+    QDate today = QDate::currentDate();
 
-    QMap<QDate, int> ddlCount;
+    QMap<QDate, QList<const Task*>> completedDDLs;
+    QMap<QDate, QList<const Task*>> pendingDDLs;
     for (const Task& t : tasks) {
         QDate d = t.deadline.date();
-        if (d.year() == today.year() && d.month() == today.month()) {
-            ddlCount[d]++;
+        if (d.year() == currentMonth.year() && d.month() == currentMonth.month()) {
+            if (t.completed && t.completedAt.isValid()) {
+                QDate completedDate = t.completedAt.date();
+                completedDDLs[completedDate].append(&t);
+            } else if (!t.completed) {
+                pendingDDLs[d].append(&t);
+            }
         }
     }
 
-    QLabel* header = new QLabel(QString("%1月").arg(today.month()));
-    header->setStyleSheet("color:#666;font-size:11px;margin-bottom:4px;");
-    heatGrid->addWidget(header, 0, 0, 1, 7);
+    QWidget* headerRow = new QWidget;
+    QHBoxLayout* headerLayout = new QHBoxLayout(headerRow);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
+
+    QLabel* titleLabel = new QLabel(QString("%1月 DDL 热力图").arg(currentMonth.month()));
+    titleLabel->setStyleSheet(QString("font-size:18px;font-weight:700;color:%1;").arg(Theme::PRIMARY));
+    headerLayout->addWidget(titleLabel);
+    headerLayout->addStretch();
+
+    QWidget* monthNav = new QWidget;
+    QHBoxLayout* navLayout = new QHBoxLayout(monthNav);
+    navLayout->setContentsMargins(0, 0, 0, 0);
+    navLayout->setSpacing(8);
+
+    QPushButton* prevBtn = new QPushButton("◀");
+    prevBtn->setFixedSize(28, 28);
+    prevBtn->setStyleSheet("QPushButton{background:#F5F5F5;border-radius:14px;border:none;}QPushButton:hover{background:#E0E0E0;}");
+    connect(prevBtn, &QPushButton::clicked, [this]() { changeMonth(-1); });
+
+    QLabel* currentLabel = new QLabel(QString::number(currentMonth.month()));
+    currentLabel->setStyleSheet("font-size:14px;font-weight:600;color:#333;min-width:24px;");
+    currentLabel->setAlignment(Qt::AlignCenter);
+
+    QPushButton* nextBtn = new QPushButton("▶");
+    nextBtn->setFixedSize(28, 28);
+    nextBtn->setStyleSheet("QPushButton{background:#F5F5F5;border-radius:14px;border:none;}QPushButton:hover{background:#E0E0E0;}");
+    connect(nextBtn, &QPushButton::clicked, [this]() { changeMonth(1); });
+
+    navLayout->addWidget(prevBtn);
+    navLayout->addWidget(currentLabel);
+    navLayout->addWidget(nextBtn);
+    headerLayout->addWidget(monthNav);
+    heatGrid->addWidget(headerRow, 0, 0, 1, 7);
+
+    int totalDDLs = completedDDLs.size() + pendingDDLs.size();
+    int doneCount = completedDDLs.size();
+    int pendingCount = pendingDDLs.size();
+    int overdueCount = 0;
+    QDate busiestDay;
+    int maxTasks = 0;
+    for (const QDate& d : completedDDLs.keys()) {
+        int cnt = completedDDLs.value(d).size();
+        if (cnt > maxTasks) { maxTasks = cnt; busiestDay = d; }
+    }
+    for (const QDate& d : pendingDDLs.keys()) {
+        int cnt = pendingDDLs.value(d).size();
+        if (cnt > maxTasks) { maxTasks = cnt; busiestDay = d; }
+    }
+
+    QWidget* statsRow = new QWidget;
+    QHBoxLayout* statsLayout = new QHBoxLayout(statsRow);
+    statsLayout->setContentsMargins(0, 8, 0, 8);
+    statsLayout->setSpacing(12);
+
+    auto makeStatCard = [&](const QString& num, const QString& label, const QString& color) -> QFrame* {
+        QFrame* card = new QFrame;
+        card->setStyleSheet(QString("background:%1;border-radius:8px;padding:8px 12px;").arg(color));
+        QVBoxLayout* l = new QVBoxLayout(card);
+        l->setContentsMargins(0, 0, 0, 0);
+        QLabel* n = new QLabel(num);
+        n->setStyleSheet("font-size:16px;font-weight:700;color:#333;");
+        QLabel* t = new QLabel(label);
+        t->setStyleSheet("font-size:10px;color:#666;");
+        l->addWidget(n);
+        l->addWidget(t);
+        return card;
+    };
+
+    statsLayout->addWidget(makeStatCard(QString::number(totalDDLs), "本月DDL", "#F5F5F5"));
+    statsLayout->addWidget(makeStatCard(QString::number(doneCount), "已完成", "#E8F5E9"));
+    statsLayout->addWidget(makeStatCard(QString::number(pendingCount), "待完成", pendingCount > 0 ? "#FFEBEE" : "#F5F5F5"));
+    statsLayout->addWidget(makeStatCard(busiestDay.isValid() ? busiestDay.toString("M/d") : "-", "最忙日", busiestDay.isValid() ? "#FFF3E0" : "#F5F5F5"));
+    statsLayout->addStretch();
+
+    heatGrid->addWidget(statsRow, 1, 0, 1, 7);
 
     QStringList weekDays = {"一", "二", "三", "四", "五", "六", "日"};
     for (int i = 0; i < 7; ++i) {
         QLabel* day = new QLabel(weekDays[i]);
-        day->setStyleSheet("color:#999;font-size:10px;");
-        heatGrid->addWidget(day, 1, i);
+        day->setStyleSheet("color:#888;font-size:11px;font-weight:600;");
+        day->setAlignment(Qt::AlignCenter);
+        heatGrid->addWidget(day, 2, i);
     }
 
     int startWeekday = firstDayOfMonth.dayOfWeek();
-    int row = 2;
+    int row = 3;
     int col = startWeekday - 1;
 
     for (int day = 1; day <= daysInMonth; ++day) {
-        QDate d(today.year(), today.month(), day);
-        int count = ddlCount.value(d, 0);
-
-        QString color;
-        if (count == 0) {
-            color = Theme::BORDER;
-        } else if (count == 1) {
-            color = Theme::PRIMARY_LIGHT;
-        } else if (count == 2) {
-            color = Theme::PRIMARY_LIGHTER;
-        } else {
-            color = Theme::PRIMARY;
-        }
+        QDate d(currentMonth.year(), currentMonth.month(), day);
+        QList<const Task*> dayCompleted = completedDDLs.value(d);
+        QList<const Task*> dayPending = pendingDDLs.value(d);
+        int completedCount = dayCompleted.size();
+        int pendingCount = dayPending.size();
 
         QFrame* cell = new QFrame;
-        cell->setFixedSize(28, 28);
-        cell->setStyleSheet(QString("background:%1;border-radius:4px;").arg(color));
+        cell->setFixedSize(36, 36);
+        cell->setCursor(Qt::PointingHandCursor);
+        cell->setStyleSheet("border-radius:8px;");
 
-        if (d == today) {
-            cell->setStyleSheet(QString("background:%1;border-radius:4px;border:2px solid #333;").arg(color));
+        QVBoxLayout* cellLayout = new QVBoxLayout(cell);
+        cellLayout->setContentsMargins(0,0,0,0);
+        cellLayout->setSpacing(0);
+        cellLayout->setAlignment(Qt::AlignCenter);
+
+        QString bgColor = "#FAFAFA";
+        QString textColor = "#999";
+        if (completedCount > 0 && pendingCount == 0) {
+            bgColor = completedCount == 1 ? "#C8E6C9" : (completedCount <= 3 ? "#A5D6A7" : "#81C784");
+            textColor = "#2E7D32";
+        } else if (pendingCount > 0) {
+            if (pendingCount == 1) { bgColor = "#FFCDD2"; textColor = "#C62828"; }
+            else if (pendingCount <= 3) { bgColor = "#EF9A9A"; textColor = "#C62828"; }
+            else if (pendingCount <= 5) { bgColor = "#E57373"; textColor = "#B71C1C"; }
+            else { bgColor = "#F44336"; textColor = "#B71C1C"; }
+        } else if (d == today) {
+            bgColor = "#E3F2FD";
+            textColor = Theme::PRIMARY;
         }
 
-        if (d < today) {
-            cell->setEnabled(false);
+        QLabel* dayLabel = new QLabel(QString::number(day));
+        dayLabel->setAlignment(Qt::AlignCenter);
+        dayLabel->setStyleSheet(QString("font-size:13px;font-weight:600;color:%1;").arg(textColor));
+        cell->setStyleSheet(QString("background:%1;border-radius:8px;").arg(bgColor));
+        cell->layout()->addWidget(dayLabel);
+
+        QString tooltipText;
+        if (completedCount == 0 && pendingCount == 0) {
+            tooltipText = QString("📅 %1\n未完成DDL").arg(d.toString("M月d日"));
+        } else {
+            tooltipText = QString("📅 %1\n\n").arg(d.toString("M月d日"));
+            if (completedCount > 0) {
+                tooltipText += QString("✓ 已完成 (%1):\n").arg(completedCount);
+                for (const Task* t : dayCompleted) {
+                    tooltipText += "  " + t->title + "\n";
+                }
+            }
+            if (pendingCount > 0) {
+                tooltipText += QString("\n⚠ 待完成 (%1):\n").arg(pendingCount);
+                for (const Task* t : dayPending) {
+                    tooltipText += "  " + t->title + "\n";
+                }
+            }
         }
+
+        QLabel* tip = new QLabel(tooltipText);
+        tip->setWordWrap(true);
+        tip->setStyleSheet(R"(
+            background:#FFFFFF;
+            color:#333333;
+            padding:16px;
+            border-radius:12px;
+            font-size:13px;
+        )");
+        tip->setMinimumWidth(220);
+        tip->setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint);
+        tip->setAttribute(Qt::WA_TranslucentBackground);
+
+        QGraphicsDropShadowEffect* shadow = new QGraphicsDropShadowEffect;
+        shadow->setBlurRadius(20);
+        shadow->setColor(QColor(0, 0, 0, 40));
+        shadow->setOffset(0, 4);
+        tip->setGraphicsEffect(shadow);
+
+        tip->hide();
+
+        cell->installEventFilter(this);
+        cell->setProperty("tipWidget", QVariant::fromValue<QObject*>(tip));
 
         heatGrid->addWidget(cell, row, col);
 
@@ -402,9 +489,44 @@ void StatsPage::updateHeatmap(const QList<Task>& tasks)
         }
     }
 
-    QLabel* legend = new QLabel("少→多");
-    legend->setStyleSheet("color:#999;font-size:10px;margin-top:8px;");
-    heatGrid->addWidget(legend, row + 1, 0);
+    QFrame* legend = new QFrame;
+    legend->setStyleSheet("background:transparent;padding:12px 0 0 0;");
+    QHBoxLayout* legLayout = new QHBoxLayout(legend);
+    legLayout->setSpacing(12);
+
+    QLabel* noneLeg = new QLabel("○ 无");
+    noneLeg->setFixedSize(24, 24);
+    noneLeg->setAlignment(Qt::AlignCenter);
+    noneLeg->setStyleSheet("font-size:10px;color:#999;background:#FAFAFA;border-radius:4px;");
+
+    QLabel* lowLeg = new QLabel("1");
+    lowLeg->setFixedSize(24, 24);
+    lowLeg->setAlignment(Qt::AlignCenter);
+    lowLeg->setStyleSheet("font-size:10px;color:#2E7D32;background:#C8E6C9;border-radius:4px;");
+
+    QLabel* midLeg = new QLabel("2-3");
+    midLeg->setFixedSize(24, 24);
+    midLeg->setAlignment(Qt::AlignCenter);
+    midLeg->setStyleSheet("font-size:9px;color:#2E7D32;background:#A5D6A7;border-radius:4px;");
+
+    QLabel* highLeg = new QLabel("4-5");
+    highLeg->setFixedSize(24, 24);
+    highLeg->setAlignment(Qt::AlignCenter);
+    highLeg->setStyleSheet("font-size:9px;color:#B71C1C;background:#EF9A9A;border-radius:4px;");
+
+    QLabel* busyLeg = new QLabel("6+");
+    busyLeg->setFixedSize(24, 24);
+    busyLeg->setAlignment(Qt::AlignCenter);
+    busyLeg->setStyleSheet("font-size:9px;color:white;background:#F44336;border-radius:4px;");
+
+    legLayout->addStretch();
+    legLayout->addWidget(noneLeg);
+    legLayout->addWidget(lowLeg);
+    legLayout->addWidget(midLeg);
+    legLayout->addWidget(highLeg);
+    legLayout->addWidget(busyLeg);
+
+heatGrid->addWidget(legend, row + 1, 0, 1, 7);
 }
 
 void StatsPage::updateTrend(const QList<Task>& tasks)
@@ -487,62 +609,79 @@ void StatsPage::updateSuggestions(const QList<Task>& tasks, const QList<Course>&
 {
     clearLayout(suggestContainer);
 
-    QDateTime now = QDateTime::currentDateTime();
-
-    int overdueCount = 0;
+    QMap<QString, int> totalCounter;
+    QMap<QString, int> completedCounter;
     for (const Task& t : tasks) {
-        if (t.isOverdue()) overdueCount++;
-    }
-    if (overdueCount > 0) {
-        QLabel* tip = new QLabel(QString("⚠ 您有 %1 个逾期任务，请尽快处理").arg(overdueCount));
-        tip->setStyleSheet("color:#C62828;font-size:12px;padding:8px;background:#FFEBEE;border-radius:8px;");
-        suggestContainer->addWidget(tip);
-    }
-
-    QMap<QString, int> courseTaskCount;
-    for (const Task& t : tasks) {
-        if (!t.completed) courseTaskCount[t.course]++;
-    }
-    for (const auto& pair : courseTaskCount.toStdMap()) {
-        if (pair.second >= 3) {
-            QLabel* tip = new QLabel(QString("📚 %1 课程有 %2 个待办任务，建议提前规划").arg(pair.first).arg(pair.second));
-            tip->setStyleSheet("color:#E65100;font-size:12px;padding:8px;background:#FFF3E0;border-radius:8px;");
-            suggestContainer->addWidget(tip);
+        totalCounter[t.course]++;
+        if (t.completed) {
+            completedCounter[t.course]++;
         }
     }
 
-    int total = tasks.size();
-    int completed = 0;
-    for (const Task& t : tasks) {
-        if (t.completed) completed++;
+    QVector<QPair<QString, int>> sorted;
+    for (auto it = totalCounter.begin(); it != totalCounter.end(); ++it) {
+        sorted.append(qMakePair(it.key(), it.value()));
     }
-    double rate = total > 0 ? completed * 100.0 / total : 0;
-    if (total > 5 && rate >= 80) {
-        QLabel* tip = new QLabel(QString("🎉 太棒了！任务完成率 %1%，继续保持！").arg(qRound(rate)));
-        tip->setStyleSheet("color:#2E7D32;font-size:12px;padding:8px;background:#E8F5E9;border-radius:8px;");
-        suggestContainer->addWidget(tip);
+    std::sort(sorted.begin(), sorted.end(), [](const auto& a, const auto& b) {
+        return a.second > b.second;
+    });
+
+    for (const auto& pair : sorted) {
+        int total = pair.second;
+        int completed = completedCounter.value(pair.first, 0);
+        int pending = total - completed;
+
+        QFrame* row = new QFrame;
+        row->setStyleSheet("background:#FEFEFE;border-radius:8px;padding:8px;");
+
+        QHBoxLayout* rowLayout = new QHBoxLayout(row);
+        rowLayout->setContentsMargins(8,4,8,4);
+
+        QLabel* name = new QLabel(pair.first);
+        name->setStyleSheet("color:#333;font-size:12px;font-weight:500;min-width:80px;");
+        rowLayout->addWidget(name);
+
+        QFrame* barBg = new QFrame;
+        barBg->setFixedHeight(12);
+        barBg->setStyleSheet("background:#E0E0E0;border-radius:4px;");
+        QHBoxLayout* barLayout = new QHBoxLayout(barBg);
+        barLayout->setContentsMargins(0, 0, 0, 0);
+        barLayout->setSpacing(0);
+
+        if (completed > 0) {
+            QFrame* doneBar = new QFrame;
+            doneBar->setMinimumHeight(12);
+            doneBar->setMaximumHeight(12);
+            doneBar->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+            doneBar->setStyleSheet("background:#2196F3;border-top-left-radius:3px;border-bottom-left-radius:3px;");
+            barLayout->addWidget(doneBar, completed);
+        }
+        if (pending > 0) {
+            QFrame* pendingBar = new QFrame;
+            pendingBar->setMinimumHeight(12);
+            pendingBar->setMaximumHeight(12);
+            pendingBar->setSizePolicy(QSizePolicy::Ignored, QSizePolicy::Fixed);
+            if (completed > 0) {
+                pendingBar->setStyleSheet("background:#F44336;border-top-right-radius:3px;border-bottom-right-radius:3px;");
+            } else {
+                pendingBar->setStyleSheet("background:#F44336;border-radius:3px;");
+            }
+            barLayout->addWidget(pendingBar, pending);
+        }
+
+        rowLayout->addWidget(barBg, 1);
+
+        QLabel* count = new QLabel(QString::number(total));
+        count->setStyleSheet("color:#666;font-size:12px;min-width:24px;text-align:right;");
+        rowLayout->addWidget(count);
+
+        suggestContainer->addWidget(row);
     }
 
-    int urgentCount = 0;
-    for (const Task& t : tasks) {
-        if (!t.completed && t.daysLeft() >= 0 && t.daysLeft() <= 2) urgentCount++;
-    }
-    if (urgentCount > 0) {
-        QLabel* tip = new QLabel(QString("⏰ 即将到期：%1 个任务需要在2天内完成").arg(urgentCount));
-        tip->setStyleSheet("color:#F57C00;font-size:12px;padding:8px;background:#FFF8E1;border-radius:8px;");
-        suggestContainer->addWidget(tip);
-    }
-
-    if (tasks.isEmpty()) {
-        QLabel* tip = new QLabel("📝 暂无任务，快去添加一些任务吧！");
-        tip->setStyleSheet("color:#666;font-size:12px;padding:8px;background:#F5F5F5;border-radius:8px;");
-        suggestContainer->addWidget(tip);
-    }
-
-    if (suggestContainer->count() == 0) {
-        QLabel* tip = new QLabel("💡 继续保持，当前没有需要特别注意的事项");
-        tip->setStyleSheet("color:#666;font-size:12px;padding:8px;background:#F5F5F5;border-radius:8px;");
-        suggestContainer->addWidget(tip);
+    if (sorted.isEmpty()) {
+        QLabel* empty = new QLabel("暂无任务");
+        empty->setStyleSheet("color:#999;font-size:12px;padding:16px;");
+        suggestContainer->addWidget(empty);
     }
 }
 
@@ -551,8 +690,44 @@ void StatsPage::refreshData()
     refresh();
 }
 
+void StatsPage::changeMonth(int delta)
+{
+    currentMonth = currentMonth.addMonths(delta);
+    const QList<Task>& tasks = DataManager::instance().tasks();
+    updateHeatmap(tasks);
+}
+
 void StatsPage::showWeeklySummary()
 {
     WeeklySummaryDialog dlg(this);
     dlg.exec();
+}
+
+bool StatsPage::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::Enter) {
+        QObject *tipObj = obj->property("tipWidget").value<QObject*>();
+        if (tipObj) {
+            QLabel *tip = qobject_cast<QLabel*>(tipObj);
+            if (tip) {
+                QWidget *cell = qobject_cast<QWidget*>(obj);
+                if (cell) {
+                    tip->adjustSize();
+                    QPoint pos = cell->mapToGlobal(QPoint(0, cell->height() + 8));
+                    tip->move(pos);
+                    tip->raise();
+                    tip->show();
+                }
+            }
+        }
+    } else if (event->type() == QEvent::Leave) {
+        QObject *tipObj = obj->property("tipWidget").value<QObject*>();
+        if (tipObj) {
+            QLabel *tip = qobject_cast<QLabel*>(tipObj);
+            if (tip) {
+                tip->hide();
+            }
+        }
+    }
+    return QWidget::eventFilter(obj, event);
 }

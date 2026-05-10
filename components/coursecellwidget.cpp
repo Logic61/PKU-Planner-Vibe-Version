@@ -20,20 +20,27 @@
 CourseCellWidget::CourseCellWidget(int row, int col, QWidget *parent)
     : QFrame(parent), m_row(row), m_col(col), m_index(-1)
 {
+    setCursor(Qt::PointingHandCursor);
+    setMouseTracking(true);
+
+    m_clickTimer = new QTimer(this);
+    m_clickTimer->setSingleShot(true);
+    m_clickTimer->setInterval(300);
+
     setMinimumSize(50, 48);               // 覆盖原本的10px最小高度
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
     setStyleSheet(QString(R"(
         QFrame {
             background:#FAFAFA;
-            border-radius:10px;
-            border:1px solid transparent;
+            border-radius:12px;
+            border:1px solid #F0F0F0;
         }
         QFrame:hover {
-            background:%1;
-            border:1px solid %2;
+            background:#FFF8F8;
+            border:1px solid #8C1D2C;
         }
-    )").arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY));
+    )"));
 
     QVBoxLayout *layout = new QVBoxLayout(this);
     layout->setContentsMargins(4,2,4,2);
@@ -167,6 +174,9 @@ void CourseCellWidget::leaveEvent(QEvent *)
 
 void CourseCellWidget::mouseDoubleClickEvent(QMouseEvent *)
 {
+    m_clickTimer->stop();
+    m_clicked = false;
+
     if(title->text().isEmpty())
     {
         emit createCourseRequested(m_row, m_col);
@@ -185,11 +195,19 @@ void CourseCellWidget::mouseDoubleClickEvent(QMouseEvent *)
 
 void CourseCellWidget::mousePressEvent(QMouseEvent *event)
 {
-    if (event->button() == Qt::LeftButton && m_index != -1 && !title->text().isEmpty()) {
-        const auto courses = DataManager::instance().courses();
-        if (m_index >= 0 && m_index < courses.size()) {
-            emit courseClicked(courses[m_index]);
-        }
+    if (event->button() == Qt::LeftButton) {
+        m_clicked = true;
+        m_clickTimer->stop();
+
+        QTimer::singleShot(300, this, [this]() {
+            if (m_clicked && m_index != -1 && !title->text().isEmpty()) {
+                const auto courses = DataManager::instance().courses();
+                if (m_index >= 0 && m_index < courses.size()) {
+                    emit courseClicked(courses[m_index]);
+                }
+            }
+            m_clicked = false;
+        });
     }
     QFrame::mousePressEvent(event);
 }
@@ -233,6 +251,7 @@ void CourseCellWidget::contextMenuEvent(QContextMenuEvent *event)
             // Right-click edit goes directly to edit dialog, bypassing ActionDialog
             emit editCourseDirectlyRequested(m_index);
         } else if (selected == deleteAction && m_index != -1) {
+            qDebug() << "[CourseCellWidget] Delete action selected. Emitting deleteCourseRequested with index:" << m_index << "for course:" << m_courseName;
             emit deleteCourseRequested(m_index);
         } else if (selected == addDDLAction) {
             emit addDDLRequested(m_courseName);

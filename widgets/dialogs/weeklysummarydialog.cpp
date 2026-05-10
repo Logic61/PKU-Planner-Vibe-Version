@@ -9,6 +9,7 @@
 #include <QMouseEvent>
 #include <QGuiApplication>
 #include <QScreen>
+#include <QShowEvent>
 
 class WeeklySummaryDialog::PrivateData {
 public:
@@ -136,43 +137,58 @@ WeeklySummaryDialog::WeeklySummaryDialog(QWidget* parent)
 
     if (!summary.busiestCourse.isEmpty()) {
         QFrame* busiestCard = new QFrame;
-        busiestCard->setStyleSheet("QFrame { background: #FFF3E0; border-radius: 12px; padding: 12px; }");
-        QHBoxLayout* busiestLayout = new QHBoxLayout(busiestCard);
+        busiestCard->setStyleSheet("QFrame { background: white; border: none; border-radius: 12px; padding: 12px; }");
+        QVBoxLayout* busiestLayout = new QVBoxLayout(busiestCard);
         busiestLayout->setContentsMargins(10, 8, 10, 8);
-        QLabel* busiestIcon = new QLabel("🔥", busiestCard);
-        busiestIcon->setStyleSheet("font-size: 18px;");
-        busiestLayout->addWidget(busiestIcon);
-        QLabel* busiestLabel = new QLabel(QString("最忙课程: %1 (%2 个任务)").arg(summary.busiestCourse).arg(summary.busiestCourseTasks), busiestCard);
-        busiestLabel->setStyleSheet("font-size: 13px; color: #E65100;");
-        busiestLayout->addWidget(busiestLabel, 1);
+
+        QLabel* busiestTitle = new QLabel(QString("最忙课程: %1").arg(summary.busiestCourse), busiestCard);
+        busiestTitle->setStyleSheet("font-size: 13px; color: #E65100; font-weight: 600;");
+        busiestLayout->addWidget(busiestTitle);
+
+        QFrame* barBg = new QFrame;
+        barBg->setFixedHeight(8);
+        barBg->setStyleSheet("QFrame { background: #F5F5F5; border-radius: 4px; }");
+        QHBoxLayout* barLayout = new QHBoxLayout(barBg);
+        barLayout->setContentsMargins(0, 0, 0, 0);
+        barLayout->setSpacing(0);
+
+        int total = summary.busiestCourseTasks;
+        int completed = qMin(total, 3);
+        int pending = total - completed;
+        if (completed > 0) {
+            QFrame* completedBar = new QFrame;
+            completedBar->setStyleSheet("background: #4CAF50; border-top-left-radius: 4px; border-bottom-left-radius: 4px;");
+            completedBar->setFixedHeight(8);
+            barLayout->addWidget(completedBar, completed);
+        }
+        if (pending > 0) {
+            QFrame* pendingBar = new QFrame;
+            if (completed > 0) {
+                pendingBar->setStyleSheet("background: #FF5722; border-top-right-radius: 4px; border-bottom-right-radius: 4px;");
+            } else {
+                pendingBar->setStyleSheet("background: #FF5722; border-radius: 4px;");
+            }
+            pendingBar->setFixedHeight(8);
+            barLayout->addWidget(pendingBar, pending);
+        }
+
+        QLabel* busiestInfo = new QLabel(QString("✓ 完成: %1  ⚠ 待完成: %2").arg(completed).arg(pending), busiestCard);
+        busiestInfo->setStyleSheet("font-size: 11px; color: #888;");
+        busiestLayout->addWidget(barBg);
+        busiestLayout->addWidget(busiestInfo);
+
         contentLayout->addWidget(busiestCard);
     }
 
-    if (summary.avgEarlyDays > 0) {
-        QFrame* earlyCard = new QFrame;
-        earlyCard->setStyleSheet("QFrame { background: #E8F5E9; border-radius: 12px; padding: 12px; }");
-        QHBoxLayout* earlyLayout = new QHBoxLayout(earlyCard);
-        earlyLayout->setContentsMargins(10, 8, 10, 8);
-        QLabel* earlyIcon = new QLabel("⏰", earlyCard);
-        earlyIcon->setStyleSheet("font-size: 18px;");
-        earlyLayout->addWidget(earlyIcon);
-        QLabel* earlyLabel = new QLabel(QString("平均提前 %1 天完成").arg(summary.avgEarlyDays, 0, 'f', 1), earlyCard);
-        earlyLabel->setStyleSheet("font-size: 13px; color: #2E7D32;");
-        earlyLayout->addWidget(earlyLabel, 1);
-        contentLayout->addWidget(earlyCard);
-    }
-
     QFrame* suggestionCard = new QFrame;
-    suggestionCard->setStyleSheet(QString("QFrame { background: %1; border-radius: 12px; padding: 12px; border-left: 3px solid %2; }").arg(Theme::CARD_BG).arg(Theme::PRIMARY));
-    QHBoxLayout* suggestionLayout = new QHBoxLayout(suggestionCard);
-    suggestionLayout->setContentsMargins(10, 8, 10, 8);
-    QLabel* suggestionIcon = new QLabel("💡", suggestionCard);
-    suggestionIcon->setStyleSheet("font-size: 18px;");
-    suggestionLayout->addWidget(suggestionIcon);
-    QLabel* suggestionLabel = new QLabel(summary.suggestion, suggestionCard);
+    suggestionCard->setStyleSheet("background: #FFFDE7; border-radius: 12px;");
+    QVBoxLayout* suggestionLayout = new QVBoxLayout(suggestionCard);
+    suggestionLayout->setContentsMargins(12, 12, 12, 12);
+
+    QLabel* suggestionLabel = new QLabel(QString("💡 %1").arg(summary.suggestion), suggestionCard);
     suggestionLabel->setWordWrap(true);
-    suggestionLabel->setStyleSheet("font-size: 13px; color: #444;");
-    suggestionLayout->addWidget(suggestionLabel, 1);
+    suggestionLabel->setStyleSheet("font-size: 13px; color: #333;");
+    suggestionLayout->addWidget(suggestionLabel);
     contentLayout->addWidget(suggestionCard);
 
     QFrame* mascotCard = new QFrame;
@@ -222,6 +238,12 @@ WeeklySummaryDialog::WeeklySummaryDialog(QWidget* parent)
 WeeklySummaryDialog::~WeeklySummaryDialog()
 {
     delete d;
+}
+
+void WeeklySummaryDialog::showEvent(QShowEvent *event)
+{
+    QDialog::showEvent(event);
+    WeeklySummaryService::markSummaryShown();
 }
 
 void WeeklySummaryDialog::mousePressEvent(QMouseEvent* event)

@@ -147,8 +147,11 @@ bool ConfirmDialog::confirm(
     }
 
     if (effectiveParent) {
-        QPoint pos = effectiveParent->geometry().center() - QPoint(dialog.width() / 2, dialog.height() / 2);
-        dialog.move(pos);
+        // 强制对话框先计算自身大小
+        dialog.adjustSize();
+        
+        QPoint center = effectiveParent->mapToGlobal(effectiveParent->rect().center());
+        dialog.move(center.x() - dialog.width() / 2, center.y() - dialog.height() / 2);
     }
 
     return dialog.exec() == QDialog::Accepted;

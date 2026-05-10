@@ -5,41 +5,31 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QFrame>
+#include <QMouseEvent>
 
 OnboardingDialog::OnboardingDialog(QWidget *parent)
     : QDialog(parent)
 {
     setWindowFlags(windowFlags() & ~Qt::WindowContextHelpButtonHint);
-    setWindowFlags(windowFlags() | Qt::Dialog);
-    setModal(true);
-    resize(380, 480);
+    setModal(false);
+    resize(400, 280);
     setStyleSheet(R"(
         QDialog {
-            background: white;
+            background: #F5F5F5;
         }
         QPushButton {
             border: none;
-            border-radius: 12px;
-            padding: 14px 24px;
-            font-size: 16px;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 14px;
             font-weight: 500;
         }
-        QPushButton#primaryBtn {
+        QPushButton#okBtn {
             background: #8B1E2D;
             color: white;
         }
-        QPushButton#primaryBtn:hover {
+        QPushButton#okBtn:hover {
             background: #A02030;
-        }
-        QPushButton#primaryBtn:pressed {
-            background: #701525;
-        }
-        QPushButton#secondaryBtn {
-            background: #F5F5F5;
-            color: #666666;
-        }
-        QPushButton#secondaryBtn:hover {
-            background: #EAEAEA;
         }
     )");
 
@@ -48,83 +38,53 @@ OnboardingDialog::OnboardingDialog(QWidget *parent)
 
 void OnboardingDialog::setupUI()
 {
-    QFrame *card = new QFrame(this);
+    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout->setContentsMargins(24, 24, 24, 24);
+    mainLayout->setSpacing(16);
+
+    QFrame *card = new QFrame;
     card->setStyleSheet(R"(
         QFrame {
             background: white;
-            border-radius: 24px;
+            border-radius: 16px;
             border: 1px solid #EAEAEA;
         }
     )");
-    card->setGraphicsEffect(nullptr);
-
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setContentsMargins(0, 0, 0, 0);
-    mainLayout->addWidget(card, 1, Qt::AlignCenter);
 
     QVBoxLayout *cardLayout = new QVBoxLayout(card);
-    cardLayout->setContentsMargins(32, 40, 32, 36);
-    cardLayout->setSpacing(20);
+    cardLayout->setContentsMargins(24, 24, 24, 24);
+    cardLayout->setSpacing(16);
 
-    QLabel *logoLabel = new QLabel("🎓");
-    logoLabel->setAlignment(Qt::AlignCenter);
-    logoLabel->setStyleSheet("font-size: 56px;");
+    QLabel *iconLabel = new QLabel("📚");
+    iconLabel->setAlignment(Qt::AlignCenter);
+    iconLabel->setStyleSheet("font-size: 48px;");
 
-    QLabel *titleLabel = new QLabel("欢迎使用 PKU Planner");
+    QLabel *titleLabel = new QLabel("暂无课程");
     titleLabel->setAlignment(Qt::AlignCenter);
-    titleLabel->setStyleSheet(R"(
-        font-size: 24px;
-        font-weight: 600;
-        color: #8B1E2D;
-    )");
+    titleLabel->setStyleSheet("font-size: 20px; font-weight: 600; color: #333;");
 
-    QLabel *subtitleLabel = new QLabel("管理课程 · 追踪DDL · 统计效率");
-    subtitleLabel->setAlignment(Qt::AlignCenter);
-    subtitleLabel->setStyleSheet(R"(
-        font-size: 14px;
-        color: #999999;
-        margin-top: 4px;
-    )");
+    QLabel *tipLabel = new QLabel("在课程表空白处\n右键编辑课程 / 双击编辑课程");
+    tipLabel->setAlignment(Qt::AlignCenter);
+    tipLabel->setStyleSheet("font-size: 14px; color: #666; line-height: 1.8;");
+    tipLabel->setWordWrap(true);
 
-    cardLayout->addWidget(logoLabel);
+    QPushButton *okBtn = new QPushButton("我知道了");
+    okBtn->setObjectName("okBtn");
+    okBtn->setCursor(Qt::PointingHandCursor);
+    connect(okBtn, &QPushButton::clicked, this, &QDialog::accept);
+
+    cardLayout->addWidget(iconLabel);
     cardLayout->addWidget(titleLabel);
-    cardLayout->addWidget(subtitleLabel);
-    cardLayout->addSpacing(16);
+    cardLayout->addWidget(tipLabel);
+    cardLayout->addWidget(okBtn);
 
-    QStringList features = {"课程管理", "任务追踪", "智能分析", "资料整理"};
-    QStringList emojis = {"📚", "📝", "📊", "📁"};
-    for (int i = 0; i < features.size(); ++i) {
-        QFrame *featureItem = new QFrame;
-        featureItem->setStyleSheet("background: #FDF9F9; border-radius: 12px; padding: 12px;");
-        QHBoxLayout *fl = new QHBoxLayout(featureItem);
-        fl->setContentsMargins(16, 12, 16, 12);
-        fl->setSpacing(12);
+    mainLayout->addWidget(card);
+}
 
-        QLabel *icon = new QLabel(emojis[i]);
-        icon->setStyleSheet("font-size: 24px;");
-
-        QLabel *text = new QLabel(features[i]);
-        text->setStyleSheet("font-size: 16px; color: #333333;");
-
-        fl->addWidget(icon);
-        fl->addWidget(text);
-        fl->addStretch();
-
-        cardLayout->addWidget(featureItem);
+void OnboardingDialog::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton) {
+        accept();
     }
-
-    cardLayout->addSpacing(16);
-
-    QPushButton *primaryBtn = new QPushButton("创建第一门课程");
-    primaryBtn->setObjectName("primaryBtn");
-    primaryBtn->setCursor(Qt::PointingHandCursor);
-    connect(primaryBtn, &QPushButton::clicked, this, &QDialog::accept);
-
-    QPushButton *secondaryBtn = new QPushButton("稍后体验");
-    secondaryBtn->setObjectName("secondaryBtn");
-    secondaryBtn->setCursor(Qt::PointingHandCursor);
-    connect(secondaryBtn, &QPushButton::clicked, this, &QDialog::reject);
-
-    cardLayout->addWidget(primaryBtn);
-    cardLayout->addWidget(secondaryBtn);
+    QDialog::mousePressEvent(event);
 }

@@ -15,9 +15,11 @@
 #include "widgets/coursedetail/coursedetaildrawer.h"
 #include "pages/statspage.h"
 #include "pages/settingspage.h"
+#include "widgets/onboarding/onboardingdialog.h"
 #include "dialogs/taskeditdialog.h"
 #include "dialogs/courseeditdialog.h"
 #include "models/datamanager.h"
+#include "models/course.h"
 #include "utils/pageanimator.h"
 #include "widgets/mascot/mascotwidget.h"
 #include "widgets/dialogs/weeklysummarydialog.h"
@@ -25,6 +27,7 @@
 #include <QGuiApplication>
 #include <QScreen>
 #include <QDebug>
+#include <QApplication>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -36,7 +39,7 @@ MainWindow::MainWindow(QWidget *parent)
     mainLayout->setContentsMargins(0,0,0,0);
 
     sidebar = new SidebarWidget;
-    sidebar->setFixedWidth(200);
+    sidebar->setFixedWidth(240);
 
     QWidget *right = new QWidget;
     QVBoxLayout *rightLayout = new QVBoxLayout(right);
@@ -59,6 +62,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     courseDrawer = new CourseDetailDrawer(central);
     courseDrawer->hide();
+    central->installEventFilter(this);
 
     searchShortcut = new QShortcut(QKeySequence("Ctrl+F"), this);
     connect(searchShortcut, &QShortcut::activated, this, &MainWindow::focusSearch);
@@ -100,12 +104,9 @@ void MainWindow::initPages()
 
     const auto &courses = DataManager::instance().courses();
     if (courses.isEmpty()) {
-        QTimer::singleShot(500, this, [](){
-            QMessageBox welcome(nullptr);
-            welcome.setWindowTitle("欢迎使用 Course Helper");
-            welcome.setText("欢迎使用课程管理助手！\n\n点击课程表空白处添加您的第一门课程，开始管理您的学习吧。");
-            welcome.setIcon(QMessageBox::Information);
-            welcome.exec();
+        QTimer::singleShot(500, this, [this](){
+            OnboardingDialog dlg(this);
+            dlg.exec();
         });
     }
 
@@ -135,9 +136,10 @@ void MainWindow::initPages()
     connect(courseDrawer, &CourseDetailDrawer::editCourseRequested, this, &MainWindow::handleEditCourseRequested);
 
     mascotWidget = new MascotWidget(this);
+    mascotWidget->raise();
     connect(sidebar, &SidebarWidget::mascotClicked, this, &MainWindow::showMascotPopup);
 
-    if (WeeklySummaryService::shouldShowOnStartup() || true) {
+    if (WeeklySummaryService::shouldShowOnStartup()) {
         QTimer::singleShot(800, this, [](){
             WeeklySummaryDialog dlg;
             dlg.exec();
@@ -241,4 +243,28 @@ void MainWindow::focusSearch()
         topbar->getSearchEdit()->setFocus();
         topbar->getSearchEdit()->selectAll();
     }
+}
+
+bool MainWindow::eventFilter(QObject *obj, QEvent *event)
+{
+    if (event->type() == QEvent::MouseButtonPress && courseDrawer && courseDrawer->isDrawerOpen()) {
+        QMouseEvent *mouseEvent = static_cast<QMouseEvent *>(event);
+        QWidget *drawer = courseDrawer;
+        QWidget *clickedWidget = QApplication::widgetAt(mouseEvent->globalPosition().toPoint());
+
+        bool clickedOnDrawer = false;
+        QWidget *w = clickedWidget;
+        while (w) {
+            if (w == drawer) {
+                clickedOnDrawer = true;
+                break;
+            }
+            w = w->parentWidget();
+        }
+
+        if (!clickedOnDrawer) {
+            courseDrawer->closeDrawer();
+        }
+    }
+    return QMainWindow::eventFilter(obj, event);
 }

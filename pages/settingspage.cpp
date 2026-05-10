@@ -828,6 +828,16 @@ void SettingsPage::editSemester()
             border-radius:8px;
             padding:8px;
             background:white;
+            color: #222; /* Set text color to black */
+        }
+        QDateEdit::drop-down {
+            border: none;
+        }
+        QDateEdit::down-arrow {
+            image: url(none); /* Hide default arrow */
+        }
+        QCalendarWidget QAbstractItemView {
+            color: #222; /* Ensure calendar text is black */
         }
     )");
     startLayout->addWidget(startEdit);
@@ -849,6 +859,16 @@ void SettingsPage::editSemester()
             border-radius:8px;
             padding:8px;
             background:white;
+            color: #222; /* Set text color to black */
+        }
+        QDateEdit::drop-down {
+            border: none;
+        }
+        QDateEdit::down-arrow {
+            image: url(none); /* Hide default arrow */
+        }
+        QCalendarWidget QAbstractItemView {
+            color: #222; /* Ensure calendar text is black */
         }
     )");
     endLayout->addWidget(endEdit);

@@ -27,6 +27,8 @@ public:
     void openDrawer();
     void closeDrawer();
 
+    bool isDrawerOpen() const { return isOpen; }
+
 signals:
     void editCourseRequested(Course course);
     void deleteCourseRequested(Course course);

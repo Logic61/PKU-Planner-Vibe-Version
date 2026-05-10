@@ -109,10 +109,19 @@ void SearchPopup::addSection(const QString& title, const QString& icon, const QV
                 border-radius: 10px;
                 padding: 10px 12px;
             }
-            QFrame:hover {
+            QFrame[hovered="true"] {
                 background: %2;
             }
+            QFrame[hovered="true"] QLabel {
+                color: white;
+            }
         )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY));
+        
+connect(item, &ClickableFrame::clicked, this, [this, r]() {
+            if (r.type == SearchResult::Course) emit courseSelected(r.id);
+            else if (r.type == SearchResult::Task) emit taskSelected(r.id.toInt());
+            else if (r.type == SearchResult::File) emit fileSelected(r.id);
+        });
 
         QHBoxLayout* itemLayout = new QHBoxLayout(item);
         itemLayout->setContentsMargins(8, 6, 8, 6);
@@ -125,36 +134,16 @@ void SearchPopup::addSection(const QString& title, const QString& icon, const QV
         QVBoxLayout* textLayout = new QVBoxLayout;
         textLayout->setSpacing(2);
         QLabel* titleLabel2 = new QLabel(highlightText(r.title, keyword), item);
-        titleLabel2->setStyleSheet("color: #222; font-size: 14px; font-weight: 600;");
+        titleLabel2->setStyleSheet("font-size: 14px; font-weight: 600;");
         textLayout->addWidget(titleLabel2);
 
         QLabel* subtitleLabel = new QLabel(highlightText(r.subtitle, keyword), item);
-        subtitleLabel->setStyleSheet("color: #888; font-size: 12px;");
+        subtitleLabel->setStyleSheet("font-size: 12px;");
         subtitleLabel->setWordWrap(true);
         textLayout->addWidget(subtitleLabel);
 
         itemLayout->addLayout(textLayout, 1);
         sectionLayout->addWidget(item);
-
-        switch (r.type) {
-            case SearchResult::Course:
-                connect(item, &ClickableFrame::clicked, this, [this, r]() {
-                    emit courseSelected(r.id);
-                });
-                break;
-            case SearchResult::Task:
-                connect(item, &ClickableFrame::clicked, this, [this, r]() {
-                    bool ok;
-                    int index = r.id.toInt(&ok);
-                    if (ok) emit taskSelected(index);
-                });
-                break;
-            case SearchResult::File:
-                connect(item, &ClickableFrame::clicked, this, [this, r]() {
-                    emit fileSelected(r.id);
-                });
-                break;
-        }
     }
 
     resultsLayout->addWidget(section);
@@ -172,7 +161,7 @@ QString SearchPopup::highlightText(const QString& text, const QString& keyword)
         QString before = text.left(index);
         QString match = text.mid(index, keyword.length());
         QString after = text.mid(index + keyword.length());
-        return before + "<span style=\"color:#C62828;font-weight:700;\">" + match + "</span>" + after;
+        return before + "<span style=\"color:" + Theme::WARNING + ";font-weight:700;\">" + match + "</span>" + after;
     }
 
     return text;

@@ -107,6 +107,8 @@ set(PROJECT_SOURCES
     widgets/search/searchpopup.h
     widgets/dialogs/weeklysummarydialog.cpp
     widgets/dialogs/weeklysummarydialog.h
+    widgets/onboarding/onboardingdialog.cpp
+    widgets/onboarding/onboardingdialog.h
 )
 
 qt_add_executable(PKUPlanner

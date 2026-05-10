@@ -32,6 +32,7 @@ private slots:
 
 private:
     void positionPopup();
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
     QLineEdit *searchEdit;
     SearchPopup *searchPopup;

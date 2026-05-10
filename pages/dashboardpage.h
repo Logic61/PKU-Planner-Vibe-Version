@@ -58,15 +58,15 @@ private:
     void updateBottomStats();
     
     QVBoxLayout *ddlLayout;
+    QVBoxLayout *todayCourseLayout = nullptr;
     QLabel *todayCourseValue = nullptr;
     QLabel *todayDdlValue = nullptr;
     QLabel *weekDdlValue = nullptr;
-    
+
     void updateDDLWidget();
+    void updateTodayCourses();
     void updateWeekInfo();
     QWidget* createSuggestionCard();
-    
-    EmptyStateWidget *emptyStateWidget = nullptr;
 };
 
 #endif

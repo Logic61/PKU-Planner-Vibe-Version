@@ -2,6 +2,8 @@
 #include "../models/datamanager.h"
 #include "../models/task.h"
 #include "../services/configservice.h"
+#include <QMap>
+#include <QMapIterator>
 
 QDate WeeklySummaryService::getWeekStart(const QDate& date)
 {
@@ -40,52 +42,35 @@ QString WeeklySummaryService::generateSuggestion(int overdue, double rate, const
 
 WeeklySummary WeeklySummaryService::generate()
 {
-    WeeklySummary summary;
-    summary.totalTasks = 0;
-    summary.completedTasks = 0;
-    summary.overdueTasks = 0;
-    summary.upcomingTasks = 0;
-    summary.completionRate = 0;
-    summary.busiestCourse = "";
-    summary.busiestCourseTasks = 0;
-    summary.avgEarlyDays = 0;
-
-    const auto tasks = DataManager::instance().tasks();
-    QMap<QString, int> courseTaskCount;
-    int earlyDaysSum = 0;
-    int earlyCount = 0;
-
     QDate today = QDate::currentDate();
     QDate weekStart = getWeekStart(today);
     QDate weekEnd = weekStart.addDays(7);
 
-    for (const Task& task : tasks) {
-        if (!isThisWeek(task.deadline)) continue;
+    const QList<Task>& tasks = DataManager::instance().tasks();
 
-        summary.totalTasks++;
-        
-        if (task.completed && task.completedAt.isValid()) {
-            summary.completedTasks++;
-            int earlyDays = task.deadline.date().daysTo(task.completedAt.date());
-            if (earlyDays > 0) {
-                earlyDaysSum += earlyDays;
-                earlyCount++;
+    WeeklySummary summary = {0, 0, 0, 0, 0, "", 0, 0, ""};
+    QMap<QString, int> courseTaskCount;
+
+    for (int i = 0; i < tasks.size(); ++i) {
+        const Task& task = tasks[i];
+        QDate d = task.deadline.date();
+        QDate completedDate = task.completedAt.date();
+
+        if (d >= weekStart && d < weekEnd) {
+            summary.totalTasks++;
+            if (task.completed) {
+                summary.completedTasks++;
+            } else if (d < today) {
+                summary.overdueTasks++;
+            } else {
+                summary.upcomingTasks++;
             }
-        } else if (task.deadline < QDateTime::currentDateTime()) {
-            summary.overdueTasks++;
-        } else {
-            summary.upcomingTasks++;
+            courseTaskCount[task.course]++;
+        } else if (task.completed && completedDate >= weekStart && completedDate < weekEnd && d >= weekEnd) {
+            summary.totalTasks++;
+            summary.completedTasks++;
+            courseTaskCount[task.course]++;
         }
-
-        courseTaskCount[task.course]++;
-    }
-
-    if (summary.totalTasks > 0) {
-        summary.completionRate = (double)summary.completedTasks / summary.totalTasks * 100;
-    }
-
-    if (earlyCount > 0) {
-        summary.avgEarlyDays = (double)earlyDaysSum / earlyCount;
     }
 
     for (auto it = courseTaskCount.constBegin(); it != courseTaskCount.constEnd(); ++it) {
@@ -95,23 +80,12 @@ WeeklySummary WeeklySummaryService::generate()
         }
     }
 
-    summary.suggestion = generateSuggestion(
-        summary.overdueTasks,
-        summary.completionRate,
-        summary.busiestCourse
-    );
-
-    if (summary.completionRate >= 90) {
-        summary.mascotMessage = "🎓 太棒了！这周你简直是无敌学霸，继续保持这个状态！";
-    } else if (summary.completionRate >= 70) {
-        summary.mascotMessage = "💪 这周表现不错，保持节奏就能赢！";
-    } else if (summary.overdueTasks > 2) {
-        summary.mascotMessage = "😴 攻城狮提醒：是不是又睡过头了？快起来赶作业！";
-    } else if (summary.totalTasks == 0) {
-        summary.mascotMessage = "🌸 本周没有 DDL，可以好好休息一下啦！";
-    } else {
-        summary.mascotMessage = "📝 这周还需努力，DDL 正在逼近！";
+    if (summary.totalTasks > 0) {
+        summary.completionRate = (double)summary.completedTasks / summary.totalTasks * 100;
     }
+
+    summary.suggestion = generateSuggestion(summary.overdueTasks, summary.completionRate, summary.busiestCourse);
+    summary.mascotMessage = generateSuggestion(summary.overdueTasks, summary.completionRate, summary.busiestCourse);
 
     return summary;
 }

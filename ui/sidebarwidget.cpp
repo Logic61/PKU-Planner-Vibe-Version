@@ -23,48 +23,61 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     )").arg(Theme::PRIMARY));
 
     QVBoxLayout *layout = new QVBoxLayout(this);
-    layout->setContentsMargins(16, 18, 16, 16);
-    layout->setSpacing(10);
+    layout->setContentsMargins(12, 12, 12, 12);
+    layout->setSpacing(8);
 
-    QLabel *title = new QLabel("Course Helper");
-    title->setStyleSheet("font-size:18px; font-weight:700; padding: 6px 4px; color:#FFF;");
-    layout->addWidget(title);
+    QWidget *headerWidget = new QWidget;
+    headerWidget->setFixedHeight(100);
+    QHBoxLayout *headerLayout = new QHBoxLayout(headerWidget);
+    headerLayout->setContentsMargins(20, 20, 20, 20);
+    headerLayout->setSpacing(0);
 
-    QLabel *subtitle = new QLabel("管理课程与 DDL");
-    subtitle->setStyleSheet("color: rgba(255,255,255,0.85); font-size: 12px; padding-left: 4px;");
-    layout->addWidget(subtitle);
+    QVBoxLayout *textLayout = new QVBoxLayout;
+    textLayout->setSpacing(2);
+    textLayout->setContentsMargins(0, 0, 0, 0);
+
+    QLabel *title = new QLabel("PKU Planner+");
+    title->setStyleSheet("font-size: 22px; font-weight: 700; color: #FFF;");
+
+    QLabel *subtitle = new QLabel("北京大学课程管理系统");
+    subtitle->setStyleSheet("font-size: 12px; color: rgba(255,255,255,0.6);");
+
+    textLayout->addWidget(title);
+    textLayout->addWidget(subtitle);
+    textLayout->addStretch();
+
+    headerLayout->addLayout(textLayout);
+
+    layout->addWidget(headerWidget);
 
     btnDashboard = new QPushButton("课程表");
     btnTodo = new QPushButton("待办");
-    btnStats = new QPushButton("📊 统计");
-    btnSettings = new QPushButton("⚙ 设置");
+    btnStats = new QPushButton("统计");
+    btnSettings = new QPushButton("设置");
 
     QString buttonStyle = QString(R"(
         QPushButton {
-            background: %1;
-            color: %2;
-            border: 1px solid transparent;
-            border-radius: 14px;
-            padding: 14px 16px;
-            min-height: 44px;
+            background: #F8EDEE;
+            border: none;
+            border-radius: 18px;
+            padding: 18px;
+            min-height: 70px;
             text-align: left;
-            font-size: 14px;
+            font-size: 16px;
             font-weight: 600;
+            color: #8C1D2C;
         }
         QPushButton:hover {
-            background: %3;
-            color: %2;
+            background: #F3DCDC;
         }
         QPushButton:pressed {
-            background: %4;
-            color: %2;
+            background: #EED0D2;
         }
         QPushButton:checked {
-            background: %2;
+            background: #8C1D2C;
             color: white;
-            border: 1px solid %2;
         }
-    )").arg(Theme::PRIMARY_LIGHTER).arg(Theme::PRIMARY).arg("#FFD7DA").arg("#FFCDD2");
+    )");
     btnDashboard->setStyleSheet(buttonStyle);
     btnTodo->setStyleSheet(buttonStyle);
     btnStats->setStyleSheet(buttonStyle);

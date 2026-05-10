@@ -47,6 +47,8 @@ private:
     int m_hoverSerial = 0;
     int m_showToken = 0;
     QString m_courseName;
+    QTimer *m_clickTimer = nullptr;
+    bool m_clicked = false;
 };
 
 #endif

@@ -11,11 +11,14 @@
 #include <QPushButton>
 #include <QCheckBox>
 #include <QMessageBox>
+#include <QDialog>
 #include <QTimer>
 #include <QDateTime>
 #include <QScrollArea>
 #include <QApplication>
 #include <QDebug>
+#include <QGraphicsDropShadowEffect>
+#include <QColor>
 #include <algorithm>
 #include <vector>
 #include <utility>
@@ -74,6 +77,17 @@ QString scheduleSummaryForGroup(const QList<Course>& courses, const QList<int>& 
 }
 }
 
+namespace {
+void applyShadow(QWidget* w)
+{
+    auto* shadow = new QGraphicsDropShadowEffect;
+    shadow->setBlurRadius(20);
+    shadow->setOffset(0, 4);
+    shadow->setColor(QColor(0, 0, 0, 20));
+    w->setGraphicsEffect(shadow);
+}
+}
+
 DashboardPage::DashboardPage(QWidget *parent)
     : QWidget(parent)
 {
@@ -111,31 +125,129 @@ DashboardPage::DashboardPage(QWidget *parent)
     // 左：课程表
     QFrame *courseCard = new QFrame;
     courseCard->setStyleSheet("background:white; border-radius:20px;");
+    applyShadow(courseCard);
     QVBoxLayout *courseLayout = new QVBoxLayout(courseCard);
 
-    QLabel *courseTitle = new QLabel("课程表");
-    courseTitle->setStyleSheet("font-weight:700; font-size:16px; color:#222;");
-    courseLayout->addWidget(courseTitle);
+    QWidget *courseHeader = new QWidget;
+    QHBoxLayout *headerLayout = new QHBoxLayout(courseHeader);
+    headerLayout->setContentsMargins(0, 0, 0, 0);
 
-    emptyStateWidget = new EmptyStateWidget;
-    emptyStateWidget->setContent("📚", "还没有课程", "点击下方按钮添加第一门课程，开始规划你的学期");
-    emptyStateWidget->hide();
-    connect(emptyStateWidget, &EmptyStateWidget::buttonClicked, this, [this](){
-        createCourse(1, 1);
+    QLabel *courseTitle = new QLabel("本周课程安排");
+    courseTitle->setStyleSheet("font-weight:700; font-size:16px; color:#222;");
+
+    QPushButton *addCourseBtn = new QPushButton("+ 添加课程");
+    addCourseBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: %1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %2;
+        }
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+
+    QPushButton *importBtn = new QPushButton("导入课表");
+    importBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: white;
+            color: %1;
+            border: 1px solid %1;
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %2;
+            color: white;
+        }
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY));
+
+    headerLayout->addWidget(courseTitle);
+    headerLayout->addStretch();
+    headerLayout->addWidget(addCourseBtn);
+    headerLayout->addWidget(importBtn);
+
+    connect(addCourseBtn, &QPushButton::clicked, this, [this](){
+        QDialog *dlg = new QDialog(this);
+        dlg->setWindowTitle("添加课程");
+        dlg->setWindowFlags(dlg->windowFlags() & ~Qt::WindowContextHelpButtonHint);
+        dlg->setStyleSheet("QDialog { background: white; }");
+
+        QVBoxLayout *layout = new QVBoxLayout(dlg);
+        layout->setContentsMargins(24, 24, 24, 24);
+        layout->setSpacing(16);
+
+        QLabel *icon = new QLabel("💡");
+        icon->setAlignment(Qt::AlignCenter);
+        icon->setStyleSheet("font-size: 40px;");
+        layout->addWidget(icon);
+
+        QLabel *titleLabel = new QLabel("如何添加课程？");
+        titleLabel->setStyleSheet("font-size: 18px; font-weight: 700; color: #222;");
+        titleLabel->setAlignment(Qt::AlignCenter);
+        layout->addWidget(titleLabel);
+
+        QLabel *descLabel = new QLabel("双击课表中的灰色时间块即可添加课程。");
+        descLabel->setStyleSheet("font-size: 14px; color: #666;");
+        descLabel->setAlignment(Qt::AlignCenter);
+        descLabel->setWordWrap(true);
+        layout->addWidget(descLabel);
+
+        layout->addStretch();
+
+        QPushButton *btn = new QPushButton("我知道了");
+        btn->setStyleSheet(QString(R"(
+            QPushButton {
+                background: %1;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                padding: 10px 24px;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            QPushButton:hover {
+                background: %2;
+            }
+        )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+        connect(btn, &QPushButton::clicked, dlg, &QDialog::accept);
+        layout->addWidget(btn, 0, Qt::AlignCenter);
+
+        dlg->setMinimumWidth(280);
+        dlg->exec();
     });
-    courseLayout->addWidget(emptyStateWidget);
+
+    courseLayout->addWidget(courseHeader);
     courseLayout->addWidget(gridContainer);
 
     contentLayout->addWidget(courseCard, 7); // 70%
 
     // 右：侧栏
     QWidget *rightPanelWidget = createRightPanel();
-    contentLayout->addWidget(rightPanelWidget, 3); // 30%
+    QFrame *rightPanelFrame = new QFrame;
+    rightPanelFrame->setStyleSheet("background:white; border-radius:20px;");
+    applyShadow(rightPanelFrame);
+    QVBoxLayout *rightFrameLayout = new QVBoxLayout(rightPanelFrame);
+    rightFrameLayout->setContentsMargins(0,0,0,0);
+    rightFrameLayout->addWidget(rightPanelWidget);
+    contentLayout->addWidget(rightPanelFrame, 3); // 30%
 
     mainLayout->addLayout(contentLayout);
 
     // ===== 3. 底部统计卡片 =====
-    mainLayout->addWidget(createBottomStats());
+    QFrame *statsCard = new QFrame;
+    statsCard->setStyleSheet("background:white; border-radius:20px;");
+    applyShadow(statsCard);
+    QVBoxLayout *statsLayout = new QVBoxLayout(statsCard);
+    statsLayout->setContentsMargins(16,16,16,16);
+    statsLayout->addWidget(createBottomStats());
+    mainLayout->addWidget(statsCard);
 
     // 将 container 设置为滚动区域的内容
     scrollArea->setWidget(container);
@@ -253,7 +365,9 @@ QWidget* DashboardPage::createBottomStats()
     QWidget *widget = new QWidget;
     QHBoxLayout *layout = new QHBoxLayout(widget);
     layout->setContentsMargins(0,0,0,0);
+    layout->setSpacing(12);
 
+    QStringList icons = {"📚", "📝", "📅", "⏰"};
     QStringList titles = {
         "今日课程",
         "今日DDL",
@@ -261,58 +375,57 @@ QWidget* DashboardPage::createBottomStats()
         "当前时间"
     };
 
-    for(auto t : titles)
+    for(int i = 0; i < titles.size(); i++)
     {
-        QFrame *card = new QFrame;
-        card->setStyleSheet(
-            "background:white;border-radius:14px;padding:8px;"
-        );
+        QString t = titles[i];
+        QString icon = icons[i];
+
+        QFrame *card = new QFrame(widget);
+        card->setMinimumHeight(120);
+        card->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        card->setStyleSheet("QFrame{background:white; border-radius:20px;}");
 
         QVBoxLayout *cl = new QVBoxLayout(card);
-        cl->setContentsMargins(8,8,8,8);
+        cl->setContentsMargins(10,10,10,10);
+        cl->setSpacing(4);
+        cl->addStretch();
 
-        QLabel *num = new QLabel("0");
-        num->setStyleSheet(
-            QString("font-size:18px;font-weight:700;color:%1;").arg(Theme::PRIMARY)
-        );
+        QLabel *iconLabel = new QLabel(icon, card);
+        iconLabel->setStyleSheet("font-size:24px; color:#222; background:transparent;");
+        iconLabel->setAlignment(Qt::AlignCenter);
+        cl->addWidget(iconLabel);
 
-        QLabel *title = new QLabel(t);
-        title->setStyleSheet("color:#666;font-size:12px;");
-
+        QLabel *num = new QLabel("0", card);
+        num->setStyleSheet(QString("font-size:32px; font-weight:700; color:%1; background:transparent;").arg(Theme::PRIMARY));
+        num->setAlignment(Qt::AlignCenter);
         cl->addWidget(num);
+
+        QLabel *title = new QLabel(t, card);
+        title->setStyleSheet("font-size:14px; color:#888; background:transparent;");
+        title->setAlignment(Qt::AlignCenter);
         cl->addWidget(title);
 
-        if(t == "今日课程")
-        {
-            todayCourseValue = num;
-        }
-        else if(t == "今日DDL")
-        {
-            todayDdlValue = num;
-        }
-        else if(t == "本周DDL")
-        {
-            weekDdlValue = num;
-        }
-        else if(t == "当前时间")
-        {
-            timeLabel = num;
-            timeLabel->setStyleSheet(QString("font-size:14px;font-weight:bold;color:%1;").arg(Theme::PRIMARY));
+        cl->addStretch();
 
+        if(t == "今日课程") todayCourseValue = num;
+        else if(t == "今日DDL") todayDdlValue = num;
+        else if(t == "本周DDL") weekDdlValue = num;
+        else if(t == "当前时间") {
+            timeLabel = num;
+            timeLabel->setStyleSheet(QString("font-size:18px; font-weight:700; color:%1; background:transparent;").arg(Theme::PRIMARY));
             QTimer *timer = new QTimer(this);
             connect(timer,&QTimer::timeout,this,[=](){
-                timeLabel->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"));
-                updateBottomStats();
+                timeLabel->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd\nhh:mm:ss"));
+                updateTodayCourses();
             });
             timer->start(1000);
-            timeLabel->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss"));
+            timeLabel->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd\nhh:mm:ss"));
         }
 
         layout->addWidget(card);
     }
 
     updateBottomStats();
-
     return widget;
 }
 
@@ -373,6 +486,88 @@ void DashboardPage::updateBottomStats()
     if (weekDdlValue) {
         weekDdlValue->setText(QString::number(weekDdlCount));
     }
+
+    updateTodayCourses();
+}
+
+void DashboardPage::updateTodayCourses()
+{
+    if (!todayCourseLayout) return;
+
+    QLayoutItem *child;
+    while ((child = todayCourseLayout->takeAt(0)) != nullptr) {
+        delete child->widget();
+        delete child;
+    }
+
+    const QList<Course> courses = DataManager::instance().courses();
+    const QDate today = QDate::currentDate();
+    const int currentWeekday = today.dayOfWeek();
+
+    int currentYear = 0;
+    const int currentWeek = today.weekNumber(&currentYear);
+    const QTime now = QTime::currentTime();
+
+    struct CourseInfo {
+        int period;
+        QString name;
+        QString location;
+    };
+    QVector<CourseInfo> todayCourses;
+
+    for (const Course &course : courses) {
+        if (course.day != currentWeekday) continue;
+        if (course.weekType == 1 && currentWeek % 2 == 0) continue;
+        if (course.weekType == 2 && currentWeek % 2 == 1) continue;
+        if (course.startPeriod <= 0) continue;
+
+        todayCourses.append({course.startPeriod, course.name, course.location});
+    }
+
+    std::sort(todayCourses.begin(), todayCourses.end(), [](const CourseInfo& a, const CourseInfo& b) {
+        return a.period < b.period;
+    });
+
+    if (todayCourses.isEmpty()) {
+        QLabel *empty = new QLabel("🎉 今日无课\n好好休息一下");
+        empty->setStyleSheet("color:#999; font-size:13px;");
+        empty->setAlignment(Qt::AlignCenter);
+        todayCourseLayout->addWidget(empty);
+        return;
+    }
+
+    QVector<QPair<int, int>> periodTimes = {
+        {8, 0},   {9, 0},   {10, 10}, {11, 10},
+        {13, 0},  {14, 0},  {15, 10}, {16, 10},
+        {17, 10}, {18, 40}, {19, 40}, {20, 40}
+    };
+
+    for (const auto& course : todayCourses) {
+        int period = course.period;
+        if (period < 1 || period > 12) continue;
+
+        QTime startTime(periodTimes[period-1].first, periodTimes[period-1].second);
+        QTime endTime = startTime.addSecs(50 * 60);
+
+        QString stateText;
+        QString color;
+
+        if (now < startTime) {
+            color = "#222";
+            stateText = "第" + QString::number(period) + "节 " + course.name;
+        } else if (now >= startTime && now < endTime) {
+            color = "#F44336";
+            stateText = "🔴 第" + QString::number(period) + "节 " + course.name;
+        } else {
+            color = "#999";
+            stateText = "✓ 第" + QString::number(period) + "节 " + course.name;
+        }
+
+        QLabel *courseLabel = new QLabel(stateText);
+        courseLabel->setStyleSheet(QString("color:%1; font-size:13px; padding:4px 0;").arg(color));
+        courseLabel->setWordWrap(true);
+        todayCourseLayout->addWidget(courseLabel);
+    }
 }
 
 QWidget* DashboardPage::createRightPanel()
@@ -386,14 +581,22 @@ QWidget* DashboardPage::createRightPanel()
     QFrame *todayCard = new QFrame;
     todayCard->setStyleSheet("background:white; border-radius:20px;");
     QVBoxLayout *todayLayout = new QVBoxLayout(todayCard);
-    
+
     QLabel *todayTitle = new QLabel("今日课程");
     todayTitle->setStyleSheet("font-weight:700; font-size:14px; color:#222;");
     todayLayout->addWidget(todayTitle);
-    
-    QLabel *todayContent = new QLabel("暂无课程");
-    todayContent->setStyleSheet("color:#999;");
-    todayLayout->addWidget(todayContent);
+
+    todayCourseLayout = new QVBoxLayout;
+    todayCourseLayout->setSpacing(8);
+    todayLayout->addLayout(todayCourseLayout);
+
+    QLabel *todayContent = new QLabel("🎉 今日无课\n好好休息一下");
+    todayContent->setStyleSheet("color:#999; font-size:13px;");
+    todayContent->setAlignment(Qt::AlignCenter);
+    todayContent->setObjectName("todayContentPlaceholder");
+    todayCourseLayout->addWidget(todayContent);
+
+    updateTodayCourses();
 
     // DDL摘要卡
     QFrame *ddlCard = new QFrame;
@@ -590,8 +793,8 @@ void DashboardPage::updateDDLWidget()
     }
     
     if (!hasDDL) {
-        QLabel *empty = new QLabel("暂无DDL");
-        empty->setStyleSheet("color:#999;");
+        QLabel *empty = new QLabel("✅ 暂无DDL");
+        empty->setStyleSheet("color:#999; font-size:13px;");
         ddlLayout->addWidget(empty);
     }
 }
@@ -603,10 +806,19 @@ void DashboardPage::initGrid()
     // 星期
     for(int col=0; col<7; col++)
     {
+        QFrame *dayFrame = new QFrame;
+        dayFrame->setStyleSheet("background:#F8F8F8; border-radius:10px;");
+        dayFrame->setFixedHeight(36);
+        QVBoxLayout *dayLayout = new QVBoxLayout(dayFrame);
+        dayLayout->setContentsMargins(0,0,0,0);
+        dayLayout->setSpacing(0);
+
         QLabel *label = new QLabel("周" + days[col]);
         label->setAlignment(Qt::AlignCenter);
         label->setStyleSheet("font-weight:700; color:#444; font-size:12px;");
-        grid->addWidget(label, 0, col+1);
+        dayLayout->addWidget(label);
+
+        grid->addWidget(dayFrame, 0, col+1);
     }
 
 // 时间（节数 + 时间段）
@@ -663,104 +875,116 @@ int DashboardPage::getNearestDDL(const QString& courseName)
 
 void DashboardPage::renderCourses()
 {
+    qDebug() << "[DashboardPage] renderCourses called.";
+    // 1. 彻底清理
     QLayoutItem *child;
     while ((child = grid->takeAt(0)) != nullptr) {
-        delete child->widget();
+        if (child->widget()) {
+            child->widget()->hide();
+            child->widget()->deleteLater();
+        }
         delete child;
     }
 
     updateDDLWidget();
-    initGrid();
+    updateBottomStats();
+    
+    // 2. 绘制表头
+    QStringList days = {"一","二","三","四","五","六","日"};
+    for(int col=0; col<7; col++) {
+        QFrame *dayFrame = new QFrame;
+        dayFrame->setStyleSheet("background:#F8F8F8; border-radius:10px;");
+        dayFrame->setFixedHeight(36);
+        QVBoxLayout *dayLayout = new QVBoxLayout(dayFrame);
+        dayLayout->setContentsMargins(0,0,0,0);
+        QLabel *label = new QLabel("周" + days[col]);
+        label->setAlignment(Qt::AlignCenter);
+        label->setStyleSheet("font-weight:700; color:#444; font-size:12px;");
+        dayLayout->addWidget(label);
+        grid->addWidget(dayFrame, 0, col+1);
+    }
 
+    QStringList timeSlots = {"8:00-8:50", "9:00-9:50", "10:10-11:00", "11:10-12:00", "13:00-13:50", "14:00-14:50", "15:10-16:00", "16:10-17:00", "17:10-18:00", "18:40-19:30", "19:40-20:30", "20:40-21:30"};
+    for(int row=0; row<12; row++) {
+        QLabel *timeLabel = new QLabel(QString("%1\n%2").arg(row+1).arg(timeSlots[row]));
+        timeLabel->setAlignment(Qt::AlignCenter);
+        timeLabel->setStyleSheet("color:#aaa; font-size:10px;");
+        grid->addWidget(timeLabel, row+1, 0);
+    }
+
+    // 3. 占用标记
+    bool occupied[14][9];
+    for(int r=0; r<14; r++) for(int c=0; c<9; c++) occupied[r][c] = false;
+
+    // 4. 渲染课程
     const auto courses = DataManager::instance().courses();
-
-    if (courses.isEmpty()) {
-        if (emptyStateWidget) {
-            emptyStateWidget->show();
-            gridContainer->hide();
-        }
-    } else {
-        if (emptyStateWidget) {
-            emptyStateWidget->hide();
-            gridContainer->show();
-        }
-
-    // 为了在课程表上显示同名课程的所有时段（每个时段独立占格），这里不再将同名课程合并为单个格子。
     for (int i = 0; i < courses.size(); ++i) {
         const Course &c = courses[i];
-        const QString courseName = c.name.trimmed();
-        if (courseName.isEmpty()) continue;
-
+        if (c.day < 1 || c.day > 7 || c.startPeriod < 1 || c.startPeriod > 12) continue;
+        
         // 周次过滤
         if (c.weekType == 1 && currentWeek % 2 == 0) continue;
         if (c.weekType == 2 && currentWeek % 2 == 1) continue;
 
-        const int daysLeft = getNearestDDL(courseName);
+        const int daysLeft = getNearestDDL(c.name);
         CourseCellWidget *cell = new CourseCellWidget(c.startPeriod, c.day);
-        cell->setCourse(courseName, c.location, c.teacher, i, daysLeft);
+        cell->setCourse(c.name, c.location, c.teacher, i, daysLeft);
 
-        connect(cell, &CourseCellWidget::editCourseRequested,
-                this, &DashboardPage::editCourse);
-        connect(cell, &CourseCellWidget::editCourseDirectlyRequested,
-                this, &DashboardPage::editCourseDirect);
-        connect(cell, &CourseCellWidget::navigateToTodoPageRequested,
-                this, &DashboardPage::navigateToTodoPageRequested);
-        connect(cell, &CourseCellWidget::deleteCourseRequested,
-                this, [this](int idx) {
-                    if (idx >= 0) {
-                        if (!ConfirmDialog::confirm(
-                            this,
-                            "删除课程",
-                            "删除课程后，关联的任务也将被删除，是否继续？",
-                            "删除",
-                            true
-                        )) {
-                            return;
-                        }
-                        DataManager::instance().deleteCourse(idx);
-                        ToastWidget::showToast(this, "课程已删除", 3000);
-                    }
-                });
-        connect(cell, &CourseCellWidget::addDDLRequested,
-                this, [this](const QString &courseName) {
-                    TaskEditDialog taskDialog(this, courseName);
-                    if (taskDialog.exec() == QDialog::Accepted) {
-                        Task newTask;
-                        newTask.course = taskDialog.getCourseName();
-                        newTask.title = taskDialog.getTitle();
-                        newTask.deadline = taskDialog.getDeadline();
-                        newTask.priority = taskDialog.getPriority();
-                        newTask.completed = false;
-                        DataManager::instance().addTask(newTask);
-                    }
-                });
-
-        // 当双击某个时段时，打开课程详情页，但课程详情应以同名课程的第一个记录为代表，
-        // 保持同名课程共享同一个课程页面/任务列表/资料绑定。
-        connect(cell, &CourseCellWidget::courseDoubleClicked,
-                this, [this, courseName](const Course &){
-            QList<Course> all = DataManager::instance().courses();
-            for (const Course &cc : all) {
-                if (cc.name == courseName) {
-                    emit openCourseDetail(cc);
-                    break;
+        // 绑定删除信号
+        connect(cell, &CourseCellWidget::deleteCourseRequested, this, [this](int idx) {
+            qDebug() << "[DashboardPage] deleteCourseRequested received for idx:" << idx;
+            if (idx >= 0 && idx < DataManager::instance().courses().size()) {
+                qDebug() << "[DashboardPage] Index" << idx << "is valid. Course name:" << DataManager::instance().courses()[idx].name;
+                if (ConfirmDialog::confirm(this, "删除课程", "确认删除该课程及其所有关联任务？", "删除", true)) {
+                    qDebug() << "[DashboardPage] Confirm dialog accepted. Calling DataManager::deleteCourse(" << idx << ")";
+                    DataManager::instance().deleteCourse(idx);
+                } else {
+                    qDebug() << "[DashboardPage] Confirm dialog rejected.";
                 }
+            } else {
+                qDebug() << "[DashboardPage] Received invalid idx:" << idx << "or courses list size is" << DataManager::instance().courses().size();
             }
         });
-
-        connect(cell, &CourseCellWidget::courseClicked,
-                this, [this](const Course &course){
+        
+        // 绑定编辑信号 (双击通常发出此信号)
+        connect(cell, &CourseCellWidget::editCourseRequested, this, &DashboardPage::editCourse);
+        
+        // 绑定直接编辑信号 (右键菜单编辑)
+        connect(cell, &CourseCellWidget::editCourseDirectlyRequested, this, &DashboardPage::editCourseDirect);
+        
+        // 绑定添加 DDL
+        connect(cell, &CourseCellWidget::addDDLRequested, this, [this](const QString &name) {
+            TaskEditDialog dlg(this, name);
+            if (dlg.exec() == QDialog::Accepted) {
+                Task t; t.course = dlg.getCourseName(); t.title = dlg.getTitle();
+                t.deadline = dlg.getDeadline(); t.priority = dlg.getPriority();
+                DataManager::instance().addTask(t);
+            }
+        });
+        
+        // 绑定点击与双击详情
+        connect(cell, &CourseCellWidget::courseClicked, this, [this](const Course& course) {
+            emit openCourseDetail(course);
+        });
+        connect(cell, &CourseCellWidget::courseDoubleClicked, this, [this](const Course& course) {
             emit openCourseDetail(course);
         });
 
-        grid->addWidget(
-            cell,
-            c.startPeriod,
-            c.day,
-            c.endPeriod - c.startPeriod + 1,
-            1
-        );
+        int rowSpan = qMax(1, c.endPeriod - c.startPeriod + 1);
+        grid->addWidget(cell, c.startPeriod, c.day, rowSpan, 1);
+        
+        for(int r = c.startPeriod; r <= c.endPeriod && r <= 12; r++) occupied[r][c.day] = true;
     }
+
+    // 5. 填充空位
+    for(int row=1; row<=12; row++) {
+        for(int col=1; col<=7; col++) {
+            if(!occupied[row][col]) {
+                CourseCellWidget *emptyCell = new CourseCellWidget(row, col);
+                grid->addWidget(emptyCell, row, col);
+                connect(emptyCell, &CourseCellWidget::createCourseRequested, this, &DashboardPage::createCourse);
+            }
+        }
     }
 }
 
@@ -1087,8 +1311,9 @@ QWidget* DashboardPage::createSuggestionCard()
     }
 
     if (layout->count() == 1) {
-        QLabel *empty = new QLabel("暂无建议");
+        QLabel *empty = new QLabel("先添加课程和任务\n系统将生成建议");
         empty->setStyleSheet(QString("color:%1;font-size:12px;").arg(Theme::TEXT_TERTIARY));
+        empty->setAlignment(Qt::AlignCenter);
         layout->addWidget(empty);
     }
 

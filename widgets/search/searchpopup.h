@@ -21,6 +21,16 @@ protected:
         QFrame::mousePressEvent(event);
         emit clicked();
     }
+    void enterEvent(QEnterEvent* event) override {
+        QFrame::enterEvent(event);
+        setProperty("hovered", true);
+        setStyleSheet(styleSheet());
+    }
+    void leaveEvent(QEvent* event) override {
+        QFrame::leaveEvent(event);
+        setProperty("hovered", false);
+        setStyleSheet(styleSheet());
+    }
 };
 
 class SearchPopup : public QWidget
