@@ -618,14 +618,20 @@ void TodoPage::editTaskByIndex(int sourceIndex)
     dialog.setWindowTitle("编辑DDL任务");
     dialog.setTaskData(task);
 
+    bool completedStatus = task.completed;
+    connect(&dialog, &QDialog::accepted, [&]() {
+        completedStatus = dialog.getCompleted();
+    });
+
     if (dialog.exec() == QDialog::Accepted) {
         Task updated = task;
         updated.course = dialog.getCourseName();
         updated.title = dialog.getTitle();
         updated.deadline = dialog.getDeadline();
         updated.priority = dialog.getPriority();
-        updated.completed = dialog.getCompleted();
+        updated.completed = completedStatus;
         DataManager::instance().updateTask(sourceIndex, updated);
+        refreshTasks();
     }
 }
 

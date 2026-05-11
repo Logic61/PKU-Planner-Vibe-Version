@@ -295,6 +295,11 @@ void CourseTaskPage::openEditTaskDialog(int sourceIndex)
     dialog.setWindowTitle("编辑任务");
     dialog.setTaskData(task);
 
+    bool completedStatus = task.completed;
+    connect(&dialog, &QDialog::accepted, [&]() {
+        completedStatus = dialog.getCompleted();
+    });
+
     if (dialog.exec() != QDialog::Accepted) {
         return;
     }
@@ -303,9 +308,9 @@ void CourseTaskPage::openEditTaskDialog(int sourceIndex)
     task.title = dialog.getTitle();
     task.deadline = dialog.getDeadline();
     task.priority = dialog.getPriority();
-    task.completed = dialog.getCompleted();
+    task.completed = completedStatus;
     DataManager::instance().updateTask(sourceIndex, task);
     emit taskUpdated();
     loadTasksFromJson();
-    renderTasks();
+renderTasks();
 }

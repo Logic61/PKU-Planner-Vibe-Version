@@ -80,6 +80,13 @@ TopbarWidget::TopbarWidget(QWidget *parent)
 
     // 安装 eventFilter 以检测点击外部的行为
     qApp->installEventFilter(this);
+
+    connect(searchEdit, &QLineEdit::textChanged, this, &TopbarWidget::onSearchTextChanged);
+    connect(searchEdit, &QLineEdit::returnPressed, this, &TopbarWidget::onSearchReturned);
+    connect(searchPopup, &SearchPopup::courseSelected, this, &TopbarWidget::onCourseSelected);
+    connect(searchPopup, &SearchPopup::taskSelected, this, &TopbarWidget::onTaskSelected);
+    connect(searchPopup, &SearchPopup::fileSelected, this, &TopbarWidget::onFileSelected);
+    connect(searchTimer, &QTimer::timeout, this, &TopbarWidget::doSearch);
 }
 
 bool TopbarWidget::eventFilter(QObject *obj, QEvent *event)

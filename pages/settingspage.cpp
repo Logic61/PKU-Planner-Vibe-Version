@@ -819,14 +819,8 @@ void SettingsPage::clearAllData()
         return;
     }
 
-    QString dataPath = QCoreApplication::instance()
-        ? QCoreApplication::applicationDirPath()
-        : QDir::currentPath();
-    QFile coursesFile(QDir(dataPath).absoluteFilePath("courses.json"));
-    QFile tasksFile(QDir(dataPath).absoluteFilePath("tasks.json"));
-    coursesFile.remove();
-    tasksFile.remove();
-    ToastWidget::showToast(this, "所有数据已清空，请重启应用", 4000);
+    DataManager::instance().clearAll();
+    ToastWidget::showToast(this, "所有数据已清空", 3000);
 }
 
 void SettingsPage::editSemester()
@@ -1033,13 +1027,10 @@ void SettingsPage::factoryReset()
         return;
     }
 
-    QString dataPath = QCoreApplication::instance()
-        ? QCoreApplication::applicationDirPath()
-        : QDir::currentPath();
-    QFile coursesFile(QDir(dataPath).absoluteFilePath("courses.json"));
-    QFile tasksFile(QDir(dataPath).absoluteFilePath("tasks.json"));
-    coursesFile.remove();
-    tasksFile.remove();
+    DataManager::instance().clearAll();
+    
+    QDir dir(DataManager::dataDirectory());
+    dir.remove("config.json");
 
     ConfigService::instance().resetAllData();
     ConfigService::instance().resetOnboarding();
@@ -1287,6 +1278,21 @@ void SettingsPage::importSchedule()
     if (importedCourses.isEmpty()) {
         QMessageBox::warning(this, "导入失败", "未找到有效的课程数据\n请检查文件格式是否正确");
         return;
+    }
+
+    if (!DataManager::instance().courses().isEmpty()) {
+        QMessageBox::StandardButton reply = ConfirmDialog::confirm3(this, "导入课表",
+            "当前已有课程，是否覆盖？\n选择\"是\"将清空现有课程并导入新课表\n选择\"否\"将追加到现有课程",
+            "是", "否", false);
+
+        if (reply == QMessageBox::Yes) {
+            auto courses = DataManager::instance().courses();
+            for (int i = courses.size() - 1; i >= 0; --i) {
+                DataManager::instance().deleteCourse(i);
+            }
+        } else if (reply == QMessageBox::Cancel) {
+            return;
+        }
     }
 
     for (const Course& c : importedCourses) {

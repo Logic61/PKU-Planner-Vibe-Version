@@ -29,6 +29,8 @@ public slots:
     void editCourseDirect(int index); // Direct edit without ActionDialog
     void applyCourseUpdate(const Course& updatedCourse);
     void refreshCourseUrgency();
+    void importSchedule();
+    void parseTimeString(const QString& timeStr, Course& c);
 
 signals:
     void navigateToTodoPageRequested();

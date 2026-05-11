@@ -224,7 +224,9 @@ int TaskEditDialog::getEstimatedHours() const {
 }
 
 bool TaskEditDialog::getCompleted() const {
-    return completedCheck->isChecked();
+    bool checked = completedCheck->isChecked();
+    qDebug() << "[TaskEditDialog] getCompleted() returning:" << checked;
+    return checked;
 }
 
 QString TaskEditDialog::getCourseName() const {

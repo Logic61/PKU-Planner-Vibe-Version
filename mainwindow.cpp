@@ -32,6 +32,17 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    // 设置初始窗口大小
+    resize(1200, 800);
+    
+    // 窗口居中显示
+    QScreen *screen = QGuiApplication::primaryScreen();
+    if (screen) {
+        QRect geom = screen->availableGeometry();
+        move(geom.left() + (geom.width() - width()) / 2,
+             geom.top() + (geom.height() - height()) / 2);
+    }
+
     QWidget *central = new QWidget;
     setCentralWidget(central);
 

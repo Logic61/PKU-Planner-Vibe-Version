@@ -6,6 +6,20 @@
 #include <QDir>
 #include <QDebug>
 #include <QSaveFile>
+#include <QStandardPaths>
+
+QString DataManager::dataDirectory()
+{
+    QString dataPath = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (dataPath.isEmpty()) {
+        dataPath = QCoreApplication::applicationDirPath();
+    }
+    QDir dir(dataPath);
+    if (!dir.exists()) {
+        dir.mkpath(".");
+    }
+    return dataPath;
+}
 
 DataManager& DataManager::instance()
 {
@@ -16,7 +30,7 @@ DataManager& DataManager::instance()
 DataManager::DataManager() : QObject(nullptr)
 {
     qDebug() << "[DataManager] Constructor called";
-    m_storageDir = QCoreApplication::instance() ? QCoreApplication::applicationDirPath() : QDir::currentPath();
+    m_storageDir = dataDirectory();
     load();
     qDebug() << "[DataManager] Data loaded, courses:" << m_courses.size() << "tasks:" << m_tasks.size();
 }
@@ -34,30 +48,7 @@ QList<Course> DataManager::courses() const
 
 void DataManager::addCourse(const Course& c)
 {
-    Course newCourse = c;
-    const int existingIndex = courseIndexByName(c.name);
-    if (existingIndex >= 0) {
-        const Course &existing = m_courses[existingIndex];
-        if (!existing.teacher.isEmpty()) {
-            newCourse.teacher = existing.teacher;
-        }
-        if (!existing.contact.isEmpty()) {
-            newCourse.contact = existing.contact;
-        }
-        if (!existing.location.isEmpty()) {
-            newCourse.location = existing.location;
-        }
-        if (!existing.examTime.isEmpty()) {
-            newCourse.examTime = existing.examTime;
-        }
-        if (!existing.note.isEmpty()) {
-            newCourse.note = existing.note;
-        }
-        if (!existing.folderPath.isEmpty()) {
-            newCourse.folderPath = existing.folderPath;
-        }
-    }
-    m_courses.append(newCourse);
+    m_courses.append(c);
     emit coursesChanged();
     saveCourses();
 }
@@ -74,24 +65,9 @@ void DataManager::updateCourse(int index, const Course& c)
 void DataManager::deleteCourse(int index)
 {
     if (index >= 0 && index < m_courses.size()) {
-        QString courseName = m_courses[index].name;
-        qDebug() << "[DataManager] Deleting course:" << courseName << "at index:" << index;
         m_courses.removeAt(index);
-        
-        int removedTasks = 0;
-        for (int i = m_tasks.size() - 1; i >= 0; --i) {
-            if (m_tasks[i].course == courseName) {
-                m_tasks.removeAt(i);
-                removedTasks++;
-            }
-        }
-        qDebug() << "[DataManager] Removed" << removedTasks << "associated tasks";
-        
-        save();
         emit coursesChanged();
-        emit tasksChanged();
-    } else {
-        qWarning() << "[DataManager] Attempted to delete invalid index:" << index;
+        saveCourses();
     }
 }
 
@@ -102,14 +78,7 @@ QList<Task> DataManager::tasks() const
 
 void DataManager::addTask(const Task& t)
 {
-    qDebug() << "[DataManager::addTask] Adding task:" << t.title << "with deadline:" << t.deadline.toString("yyyy-MM-dd hh:mm:ss");
-    Task newTask = t;
-    if (newTask.completed && !newTask.completedAt.isValid()) {
-        newTask.completedAt = QDateTime::currentDateTime();
-    }
-    m_tasks.append(newTask);
-    qDebug() << "[DataManager::addTask] Task count now:" << m_tasks.size();
-    qDebug() << "[DataManager::addTask] Emitting tasksChanged signal";
+    m_tasks.append(t);
     emit tasksChanged();
     saveTasks();
 }
@@ -120,6 +89,8 @@ void DataManager::updateTask(int index, const Task& t)
         Task updatedTask = t;
         const Task &oldTask = m_tasks[index];
         
+        qDebug() << "[DataManager] UpdateTask - Index:" << index << ", Old Completed:" << oldTask.completed << ", New Completed:" << updatedTask.completed;
+
         // If becoming completed, set completedAt
         if (updatedTask.completed && !oldTask.completed) {
             if (!updatedTask.completedAt.isValid()) {
@@ -138,6 +109,7 @@ void DataManager::updateTask(int index, const Task& t)
         m_tasks[index] = updatedTask;
         emit tasksChanged();
         saveTasks();
+        qDebug() << "[DataManager] Task updated and saved. Current task completed state:" << m_tasks[index].completed;
     }
 }
 
@@ -153,22 +125,48 @@ void DataManager::deleteTask(int index)
 void DataManager::markTaskCompleted(int index, bool completed)
 {
     if (index >= 0 && index < m_tasks.size()) {
-        m_tasks[index].completed = completed;
-        if (completed && !m_tasks[index].completedAt.isValid()) {
-            m_tasks[index].completedAt = QDateTime::currentDateTime();
-        } else if (!completed) {
-            m_tasks[index].completedAt = QDateTime();
+        Task task = m_tasks[index];
+        if (task.completed != completed) {
+            task.completed = completed;
+            if (completed) {
+                task.completedAt = QDateTime::currentDateTime();
+            } else {
+                task.completedAt = QDateTime();
+            }
+            m_tasks[index] = task;
+            emit tasksChanged();
+            saveTasks();
         }
-        emit tasksChanged();
-        saveTasks();
     }
+}
+
+void DataManager::clearAll()
+{
+    m_courses.clear();
+    m_tasks.clear();
+    
+    QString dir = dataDirectory();
+    QDir(dir).remove("courses.json");
+    QDir(dir).remove("courses.bak");
+    QDir(dir).remove("tasks.json");
+    QDir(dir).remove("tasks.bak");
+    
+    emit coursesChanged();
+    emit tasksChanged();
+    
+    qDebug() << "[DataManager] All data cleared from memory and disk.";
+}
+
+QString DataManager::storageDir() const
+{
+    return m_storageDir;
 }
 
 bool DataManager::load()
 {
     bool coursesLoaded = loadCourses();
     bool tasksLoaded = loadTasks();
-    return coursesLoaded && tasksLoaded;
+    return coursesLoaded || tasksLoaded;
 }
 
 bool DataManager::save()
@@ -178,17 +176,11 @@ bool DataManager::save()
     return coursesSaved && tasksSaved;
 }
 
-QString DataManager::storageDir() const
-{
-    return m_storageDir;
-}
-
 bool DataManager::loadCourses()
 {
     qDebug() << "[DataManager] loadCourses() starting";
     QJsonDocument doc;
     if (!loadFromFile("courses.json", doc)) {
-        // 尝试从备份加载
         if (!loadFromFile("courses.bak", doc)) {
             qWarning() << "[DataManager] 无法加载课程数据，使用空数据初始化";
             m_courses.clear();
@@ -221,7 +213,6 @@ bool DataManager::loadTasks()
 {
     QJsonDocument doc;
     if (!loadFromFile("tasks.json", doc)) {
-        // 尝试从备份加载
         if (!loadFromFile("tasks.bak", doc)) {
             qWarning() << "无法加载任务数据，使用空数据初始化";
             m_tasks.clear();
@@ -240,24 +231,11 @@ bool DataManager::loadTasks()
     
     for (const auto& item : arr) {
         if (item.isObject()) {
-            Task task;
-            QJsonObject obj = item.toObject();
-            task.course = obj["course"].toString();
-            task.title = obj["title"].toString();
-            const QString deadlineStr = obj["deadline"].toString();
-            // 使用显式格式字符串解析 ISO 8601 格式
-            task.deadline = QDateTime::fromString(deadlineStr, "yyyy-MM-ddThh:mm:ss");
-            if (!task.deadline.isValid()) {
-                qWarning() << "Failed to parse deadline:" << deadlineStr;
-            }
-            task.priority = obj["priority"].toInt();
-            task.completed = obj["completed"].toBool();
-            task.completedAt = QDateTime::fromString(obj["completedAt"].toString(), Qt::ISODate);
-            m_tasks.append(task);
+            m_tasks.append(Task::fromJson(item.toObject()));
         }
     }
     
-    qDebug() << "成功加载" << m_tasks.size() << "个任务";
+    qDebug() << "[DataManager] 成功加载" << m_tasks.size() << "个任务，发射信号";
     emit tasksChanged();
     return true;
 }
@@ -299,9 +277,7 @@ bool DataManager::saveTasks()
 
 bool DataManager::loadFromFile(const QString& filename, QJsonDocument& doc)
 {
-    QString dataDir = QCoreApplication::instance()
-        ? QCoreApplication::applicationDirPath()
-        : QDir::currentPath();
+    QString dataDir = m_storageDir.isEmpty() ? dataDirectory() : m_storageDir;
     QString fullPath = QDir(dataDir).absoluteFilePath(filename);
 
     QFile file(fullPath);
@@ -359,14 +335,4 @@ bool DataManager::saveToFile(const QString& filename, const QJsonDocument& doc)
 
     qDebug() << "[DataManager] Successfully saved:" << target;
     return true;
-}
-
-int DataManager::courseIndexByName(const QString& name) const
-{
-    for (int i = 0; i < m_courses.size(); ++i) {
-        if (m_courses[i].name == name) {
-            return i;
-        }
-    }
-    return -1;
 }

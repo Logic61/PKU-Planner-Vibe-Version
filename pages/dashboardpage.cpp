@@ -24,8 +24,17 @@
 #include <utility>
 #include <QHash>
 #include <QStringList>
+#include <QFileDialog>
+#include <QFile>
+#include <QTextStream>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QRegularExpression>
+#include <QMessageBox>
 
 #include "../models/datamanager.h"
+#include "../dialogs/confirmdialog.h"
 #include "../services/configservice.h"
 #include "../dialogs/courseeditdialog.h"
 #include "../dialogs/courseactiondialog.h"
@@ -173,6 +182,7 @@ DashboardPage::DashboardPage(QWidget *parent)
     headerLayout->addWidget(addCourseBtn);
     headerLayout->addWidget(importBtn);
 
+    connect(importBtn, &QPushButton::clicked, this, &DashboardPage::importSchedule);
     connect(addCourseBtn, &QPushButton::clicked, this, [this](){
         QDialog *dlg = new QDialog(this);
         dlg->setWindowTitle("添加课程");
@@ -1318,4 +1328,139 @@ QWidget* DashboardPage::createSuggestionCard()
     }
 
     return card;
+}
+
+void DashboardPage::importSchedule()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, "导入课表",
+        QString(),
+        "课表文件 (*.txt *.csv *.json);;所有文件 (*)");
+
+    if (fileName.isEmpty()) return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, "导入失败", "无法读取文件");
+        return;
+    }
+
+    QTextStream in(&file);
+    QString content = in.readAll();
+    file.close();
+
+    QList<Course> importedCourses;
+
+    if (fileName.endsWith(".json")) {
+        QJsonDocument doc = QJsonDocument::fromJson(content.toUtf8());
+        if (doc.isArray()) {
+            QJsonArray arr = doc.array();
+            for (int i = 0; i < arr.size(); ++i) {
+                QJsonObject obj = arr[i].toObject();
+                Course c;
+                c.name = obj["name"].toString();
+                c.teacher = obj["teacher"].toString();
+                c.location = obj["location"].toString();
+                c.day = obj["day"].toInt(1);
+                c.startPeriod = obj["startPeriod"].toInt(1);
+                c.endPeriod = obj["endPeriod"].toInt(2);
+                c.weekType = obj["weekType"].toInt(0);
+                if (!c.name.isEmpty()) {
+                    importedCourses.append(c);
+                }
+            }
+        } else if (doc.isObject()) {
+            QJsonObject root = doc.object();
+            if (root.contains("courses") && root["courses"].isArray()) {
+                QJsonArray arr = root["courses"].toArray();
+                for (int i = 0; i < arr.size(); ++i) {
+                    QJsonObject obj = arr[i].toObject();
+                    Course c;
+                    c.name = obj["name"].toString();
+                    c.teacher = obj["teacher"].toString();
+                    c.location = obj["location"].toString();
+                    c.day = obj["day"].toInt(1);
+                    c.startPeriod = obj["startPeriod"].toInt(1);
+                    c.endPeriod = obj["endPeriod"].toInt(2);
+                    c.weekType = obj["weekType"].toInt(0);
+                    if (!c.name.isEmpty()) {
+                        importedCourses.append(c);
+                    }
+                }
+            }
+        }
+    } else {
+        QStringList lines = content.split("\n", Qt::SkipEmptyParts);
+        for (const QString& line : lines) {
+            QString trimmed = line.trimmed();
+            if (trimmed.isEmpty() || trimmed.startsWith("#")) continue;
+
+            QStringList parts;
+            if (trimmed.contains(",")) {
+                parts = trimmed.split(",");
+            } else if (trimmed.contains("\t")) {
+                parts = trimmed.split("\t");
+            } else if (trimmed.contains(";")) {
+                parts = trimmed.split(";");
+            } else {
+                continue;
+            }
+
+            if (parts.size() < 3) continue;
+
+            Course c;
+            c.name = parts[0].trimmed();
+            c.teacher = parts.size() > 1 ? parts[1].trimmed() : "";
+
+            QString timeStr = parts.size() > 2 ? parts[2].trimmed() : "";
+            parseTimeString(timeStr, c);
+
+            c.location = parts.size() > 3 ? parts[3].trimmed() : "";
+
+            if (!c.name.isEmpty()) {
+                importedCourses.append(c);
+            }
+        }
+    }
+
+    if (importedCourses.isEmpty()) {
+        QMessageBox::warning(this, "导入失败", "未找到有效的课程数据\n请检查文件格式是否正确");
+        return;
+    }
+
+    if (!DataManager::instance().courses().isEmpty()) {
+        QMessageBox::StandardButton reply = ConfirmDialog::confirm3(this, "导入课表",
+            "当前已有课程，是否覆盖？\n选择\"是\"将清空现有课程并导入新课表\n选择\"否\"将追加到现有课程",
+            "是", "否", false);
+
+        if (reply == QMessageBox::Yes) {
+            auto courses = DataManager::instance().courses();
+            for (int i = courses.size() - 1; i >= 0; --i) {
+                DataManager::instance().deleteCourse(i);
+            }
+        } else if (reply == QMessageBox::Cancel) {
+            return;
+        }
+    }
+
+    for (const Course& c : importedCourses) {
+        DataManager::instance().addCourse(c);
+    }
+
+    QMessageBox::information(this, "导入成功", QString("成功导入 %1 门课程").arg(importedCourses.size()));
+    renderCourses();
+}
+
+void DashboardPage::parseTimeString(const QString& timeStr, Course& c)
+{
+    QRegularExpression re("([周星期])*([1-7])[\\s]*([0-9]+)-([0-9]+)");
+    QRegularExpressionMatch match = re.match(timeStr);
+    if (match.hasMatch()) {
+        c.day = match.captured(2).toInt();
+        c.startPeriod = match.captured(3).toInt();
+        c.endPeriod = match.captured(4).toInt();
+    } else {
+        c.day = 1;
+        c.startPeriod = 1;
+        c.endPeriod = 2;
+    }
 }

@@ -18,13 +18,14 @@ class DataManager : public QObject
     Q_OBJECT
 public:
     static DataManager& instance();
+    static QString dataDirectory();
 
     // 课程管理
     QList<Course> courses() const;
     void addCourse(const Course& c);
     void updateCourse(int index, const Course& c);
     void deleteCourse(int index);
-    
+
     // 任务管理
     QList<Task> tasks() const;
     void addTask(const Task& t);
@@ -35,6 +36,7 @@ public:
     // 持久化
     bool load();
     bool save();
+    void clearAll();
     QString storageDir() const;
 
 signals:
