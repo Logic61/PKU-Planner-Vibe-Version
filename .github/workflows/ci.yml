@@ -18,11 +18,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 使用新的环境变量语法设置路径 (GITHUB_PATH)
+      # --- 新增这一步：激活 MSVC 环境 ---
+      - name: Set up MSVC Developer Command Prompt
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Set up Environment Path
         run: |
           echo "C:\Qt\6.6\msvc2022_64\bin" >> $env:GITHUB_PATH
-          echo "C:\Program Files\CMake\bin" >> $env:GITHUB_PATH
         shell: powershell
 
       - name: Build and run unit tests
