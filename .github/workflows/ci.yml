@@ -27,7 +27,7 @@ jobs:
       - name: Set up Environment Path
         run: |
           echo "C:\Qt\6.6\msvc2022_64\bin" >> $env:GITHUB_PATH
-          echo "CMAKE_PREFIX_PATH=C:\Qt\6.6\msvc2022_64" >> $env:GITHUB_ENV
+          echo "PATH=C:\Qt\6.6\msvc2022_64\bin;%PATH%" >> $env:GITHUB_ENV
         shell: powershell
 
       - name: Build and run unit tests
