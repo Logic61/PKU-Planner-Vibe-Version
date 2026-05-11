@@ -22,6 +22,12 @@ jobs:
         with:
           arch: x64
 
+      - name: List available architectures for Qt 6.6.2 on Windows
+        run: aqt list-qt windows desktop --arch 6.6.2
+
+      - name: List modules for Qt 6.6.2 win64_msvc2022_64
+        run: aqt list-qt windows desktop --modules 6.6.2 win64_msvc2022_64
+      
       # 2. 关键：安装 Qt 6.6.0（你可以改成你喜欢的版本，如 6.6.3）
       - name: Install Qt using aqt directly
         run: |
