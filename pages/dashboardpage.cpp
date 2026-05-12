@@ -1315,10 +1315,24 @@ void DashboardPage::importSchedule()
     msgBox.setWindowTitle("导入课表");
     msgBox.setText("请选择导入方式：");
     msgBox.setIcon(QMessageBox::Question);
+    msgBox.setStyleSheet(QString(
+        "QMessageBox { background: white; border-radius: %1px; }"
+        "QLabel { font-size: 14px; color: %2; padding: 8px; }"
+        "QPushButton { "
+        "  background: white; color: %2; border: 1px solid %3; "
+        "  border-radius: %4px; padding: 10px 24px; font-size: 14px; font-weight: 500; min-width: 100px; "
+        "} "
+        "QPushButton:hover { background: %5; color: white; border-color: %3; }"
+    ).arg(Theme::CARD_RADIUS).arg(Theme::TEXT_PRIMARY).arg(Theme::PRIMARY)
+      .arg(Theme::BUTTON_RADIUS).arg(Theme::PRIMARY_DARK));
 
     QPushButton *imageBtn = msgBox.addButton("图片导入", QMessageBox::ActionRole);
     QPushButton *csvBtn = msgBox.addButton("CSV/TXT导入", QMessageBox::ActionRole);
     QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::RejectRole);
+
+    imageBtn->setCursor(Qt::PointingHandCursor);
+    csvBtn->setCursor(Qt::PointingHandCursor);
+    cancelBtn->setCursor(Qt::PointingHandCursor);
 
     msgBox.exec();
 
@@ -1491,11 +1505,31 @@ void DashboardPage::importFromImage()
     QByteArray imageData = file.readAll();
     file.close();
 
-    m_loadingDialog = new QProgressDialog("正在识别课程表...\n这可能需要几秒钟", QString(), 0, 0, this);
+    m_loadingDialog = new QProgressDialog("正在识别课程表...", "这可能需要几秒钟", 0, 0, this);
     m_loadingDialog->setWindowTitle("处理中");
     m_loadingDialog->setWindowModality(Qt::WindowModal);
     m_loadingDialog->setCancelButton(nullptr);
     m_loadingDialog->setMinimumDuration(0);
+    m_loadingDialog->setFixedSize(360, 140);
+    m_loadingDialog->setStyleSheet(QString(
+        "QProgressDialog { "
+        "  background: white; border-radius: %1px; border: 1px solid %2; "
+        "} "
+        "QLabel { "
+        "  color: %3; font-size: 15px; font-weight: 500; padding: 10px; "
+        "} "
+        "QLabel#qt_spinbox_label { "
+        "  color: %4; font-size: 13px; "
+        "} "
+        "QProgressBar { "
+        "  border: none; height: 4px; background: %5; "
+        "} "
+        "QProgressBar::chunk { "
+        "  background: %6; border-radius: 2px; "
+        "} "
+    ).arg(Theme::CARD_RADIUS).arg(Theme::BORDER)
+      .arg(Theme::TEXT_PRIMARY).arg(Theme::TEXT_SECONDARY)
+      .arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY));
     m_loadingDialog->show();
 
     callGeminiAPI(apiKey, imageData);
