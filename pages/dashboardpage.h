@@ -19,6 +19,45 @@ class EmptyStateWidget;
 #include <QNetworkAccessManager>
 #include <QProgressDialog>
 
+enum class VisionModelType {
+    Gemini,
+    Doubao
+};
+
+class ScheduleVisionParser {
+public:
+    virtual ~ScheduleVisionParser() = default;
+    virtual void parseImage(
+        const QString& imagePath,
+        const QString& apiKey,
+        QNetworkAccessManager* networkManager,
+        std::function<void(const QString&)> onSuccess,
+        std::function<void(const QString&)> onError
+    ) = 0;
+};
+
+class GeminiParser : public ScheduleVisionParser {
+public:
+    void parseImage(
+        const QString& imagePath,
+        const QString& apiKey,
+        QNetworkAccessManager* networkManager,
+        std::function<void(const QString&)> onSuccess,
+        std::function<void(const QString&)> onError
+    ) override;
+};
+
+class DoubaoParser : public ScheduleVisionParser {
+public:
+    void parseImage(
+        const QString& imagePath,
+        const QString& apiKey,
+        QNetworkAccessManager* networkManager,
+        std::function<void(const QString&)> onSuccess,
+        std::function<void(const QString&)> onError
+    ) override;
+};
+
 class DashboardPage : public QWidget
 {
     Q_OBJECT
@@ -74,10 +113,13 @@ private:
     QWidget* createSuggestionCard();
 
     void importFromImage();
-    void callGeminiAPI(const QString& apiKey, const QByteArray& imageData);
-    void onGeminiReplyFinished(QNetworkReply* reply);
+    VisionModelType selectVisionModel();
+    QString getModelApiKey(VisionModelType model);
+    void callVisionAPI(VisionModelType model, const QString& apiKey, const QString& imagePath);
+    void onVisionReplyFinished(QNetworkReply* reply);
     QNetworkAccessManager* m_networkManager = nullptr;
     QProgressDialog* m_loadingDialog = nullptr;
+    QString m_lastResponse;
 };
 
 #endif

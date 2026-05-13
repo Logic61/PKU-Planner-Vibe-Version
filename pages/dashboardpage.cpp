@@ -1,4 +1,5 @@
 #include "dashboardpage.h"
+#include <functional>
 #include "../ui/theme.h"
 #include "../ui/sidebarwidget.h"
 #include "../components/coursecellwidget.h"
@@ -1481,8 +1482,59 @@ void DashboardPage::parseTimeString(const QString& timeStr, Course& c)
     }
 }
 
+VisionModelType DashboardPage::selectVisionModel()
+{
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("选择识别模型");
+    msgBox.setText("请选择识别模型：");
+    msgBox.setIcon(QMessageBox::Question);
+    msgBox.setStyleSheet(QString(
+        "QMessageBox { background: white; border-radius: %1px; }"
+        "QLabel { font-size: 14px; color: %2; padding: 8px; }"
+        "QPushButton { "
+        "  background: white; color: %2; border: 1px solid %3; "
+        "  border-radius: %4px; padding: 10px 24px; font-size: 14px; font-weight: 500; min-width: 100px; "
+        "} "
+        "QPushButton:hover { background: %5; color: white; border-color: %3; }"
+    ).arg(Theme::CARD_RADIUS).arg(Theme::TEXT_PRIMARY).arg(Theme::PRIMARY)
+      .arg(Theme::BUTTON_RADIUS).arg(Theme::PRIMARY_DARK));
+
+    QPushButton *geminiBtn = msgBox.addButton("Gemini", QMessageBox::ActionRole);
+    QPushButton *doubaoBtn = msgBox.addButton("豆包", QMessageBox::ActionRole);
+    QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::RejectRole);
+
+    geminiBtn->setCursor(Qt::PointingHandCursor);
+    doubaoBtn->setCursor(Qt::PointingHandCursor);
+    cancelBtn->setCursor(Qt::PointingHandCursor);
+
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == geminiBtn) {
+        return VisionModelType::Gemini;
+    } else if (msgBox.clickedButton() == doubaoBtn) {
+        return VisionModelType::Doubao;
+    }
+    return VisionModelType::Gemini;
+}
+
+QString DashboardPage::getModelApiKey(VisionModelType model)
+{
+    QString title = (model == VisionModelType::Gemini) ? "Gemini API Key" : "豆包 API Key";
+    QString prompt = (model == VisionModelType::Gemini) ? "请输入 Gemini API Key:" : "请输入豆包 API Key(提示:api需开通mini模型):";
+
+    bool ok;
+    QString apiKey = QInputDialog::getText(this, title, prompt, QLineEdit::Password, "", &ok);
+
+    if (!ok || apiKey.isEmpty()) {
+        return QString();
+    }
+    return apiKey;
+}
+
 void DashboardPage::importFromImage()
 {
+    VisionModelType model = selectVisionModel();
+
     QString fileName = QFileDialog::getOpenFileName(this, "选择图片",
         QString(),
         "图片文件 (*.png *.jpg *.jpeg);;所有文件 (*)");
@@ -1491,23 +1543,11 @@ void DashboardPage::importFromImage()
         return;
     }
 
-    bool ok;
-    QString apiKey = QInputDialog::getText(this, "Gemini API Key",
-        "请输入 Gemini API Key:", QLineEdit::Password, "", &ok);
-
-    if (!ok || apiKey.isEmpty()) {
+    QString apiKey = getModelApiKey(model);
+    if (apiKey.isEmpty()) {
         QMessageBox::warning(this, "导入失败", "未输入 API Key");
         return;
     }
-
-    QFile file(fileName);
-    if (!file.open(QIODevice::ReadOnly)) {
-        QMessageBox::warning(this, "导入失败", "无法读取图片文件");
-        return;
-    }
-
-    QByteArray imageData = file.readAll();
-    file.close();
 
     m_loadingDialog = new QProgressDialog("正在识别课程表...", "这可能需要几秒钟", 0, 0, this);
     m_loadingDialog->setWindowTitle("处理中");
@@ -1536,27 +1576,12 @@ void DashboardPage::importFromImage()
       .arg(Theme::PRIMARY_LIGHT).arg(Theme::PRIMARY));
     m_loadingDialog->show();
 
-    callGeminiAPI(apiKey, imageData);
+    callVisionAPI(model, apiKey, fileName);
 }
 
-void DashboardPage::callGeminiAPI(const QString& apiKey, const QByteArray& imageData)
+QString getVisionPrompt()
 {
-    QUrl url(QString("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%1").arg(apiKey));
-
-    QNetworkRequest request(url);
-    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
-
-    QByteArray base64Image = imageData.toBase64();
-
-    QJsonObject inlineData;
-    inlineData["mime_type"] = "image/png";
-    inlineData["data"] = QString::fromLatin1(base64Image);
-
-    QJsonObject imagePart;
-    imagePart["inline_data"] = inlineData;
-
-    QJsonObject textPart;
-    QString prompt = QString::fromUtf8(
+    return QString::fromUtf8(
         "You are parsing a Peking University course schedule screenshot.\n"
         "The screenshot may contain complex nested course descriptions like:\n"
         "- 上课信息\n"
@@ -1625,7 +1650,40 @@ void DashboardPage::callGeminiAPI(const QString& apiKey, const QByteArray& image
         "9. Only output actual recurring teaching sessions. Do NOT output exam-only events, remarks, course IDs, credits, or notes.\n"
         "10. Return ONLY valid JSON."
     );
-    textPart["text"] = prompt;
+}
+
+void GeminiParser::parseImage(
+    const QString& imagePath,
+    const QString& apiKey,
+    QNetworkAccessManager* networkManager,
+    std::function<void(const QString&)> onSuccess,
+    std::function<void(const QString&)> onError)
+{
+    QFile file(imagePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        onError("无法读取图片文件");
+        return;
+    }
+
+    QByteArray imageData = file.readAll();
+    file.close();
+
+    QUrl url(QString("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%1").arg(apiKey));
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    QByteArray base64Image = imageData.toBase64();
+
+    QJsonObject inlineData;
+    inlineData["mime_type"] = "image/png";
+    inlineData["data"] = QString::fromLatin1(base64Image);
+
+    QJsonObject imagePart;
+    imagePart["inline_data"] = inlineData;
+
+    QJsonObject textPart;
+    textPart["text"] = getVisionPrompt();
 
     QJsonArray parts;
     parts.append(textPart);
@@ -1642,17 +1700,167 @@ void DashboardPage::callGeminiAPI(const QString& apiKey, const QByteArray& image
 
     QByteArray jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
 
+    QNetworkReply* reply = networkManager->post(request, jsonData);
+    QObject::connect(reply, &QNetworkReply::finished, [reply, onSuccess, onError]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            onError(QString("API请求失败: %1").arg(reply->errorString()));
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray responseData = reply->readAll();
+        reply->deleteLater();
+
+        QJsonDocument doc = QJsonDocument::fromJson(responseData);
+        if (doc.isNull()) {
+            onError("无法解析API返回的数据");
+            return;
+        }
+
+        QJsonObject root = doc.object();
+        if (!root.contains("candidates") || root["candidates"].toArray().isEmpty()) {
+            onError("API返回格式不正确");
+            return;
+        }
+
+        QJsonArray candidates = root["candidates"].toArray();
+        QJsonObject firstCandidate = candidates[0].toObject();
+        if (!firstCandidate.contains("content") || !firstCandidate["content"].toObject().contains("parts")) {
+            onError("API返回格式缺少内容");
+            return;
+        }
+
+        QJsonObject content = firstCandidate["content"].toObject();
+        QJsonArray parts = content["parts"].toArray();
+        if (parts.isEmpty()) {
+            onError("API返回没有内容");
+            return;
+        }
+
+        QString jsonText = parts[0].toObject()["text"].toString();
+        onSuccess(jsonText);
+    });
+}
+
+void DoubaoParser::parseImage(
+    const QString& imagePath,
+    const QString& apiKey,
+    QNetworkAccessManager* networkManager,
+    std::function<void(const QString&)> onSuccess,
+    std::function<void(const QString&)> onError)
+{
+    QFile file(imagePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        onError("无法读取图片文件");
+        return;
+    }
+
+    QByteArray imageData = file.readAll();
+    file.close();
+
+    QUrl url("https://ark.cn-beijing.volces.com/api/v3/chat/completions");
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+
+    QByteArray base64Image = imageData.toBase64();
+    QString base64Str = QString::fromLatin1(base64Image);
+
+    QJsonObject imageUrl;
+    imageUrl["url"] = QString("data:image/png;base64,%1").arg(base64Str);
+
+    QJsonObject imageContent;
+    imageContent["type"] = "image_url";
+    imageContent["image_url"] = imageUrl;
+
+    QJsonObject textContent;
+    textContent["type"] = "text";
+    textContent["text"] = getVisionPrompt();
+
+    QJsonArray contentArray;
+    contentArray.append(imageContent);
+    contentArray.append(textContent);
+
+    QJsonObject message;
+    message["role"] = "user";
+    message["content"] = contentArray;
+
+    QJsonArray messages;
+    messages.append(message);
+
+    QJsonObject root;
+    root["model"] = "doubao-seed-2-0-mini-260428";
+    root["messages"] = messages;
+
+    QByteArray jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
+
+    QNetworkReply* reply = networkManager->post(request, jsonData);
+    QObject::connect(reply, &QNetworkReply::finished, [reply, onSuccess, onError]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            onError(QString("API请求失败: %1").arg(reply->errorString()));
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray responseData = reply->readAll();
+        reply->deleteLater();
+
+        QJsonDocument doc = QJsonDocument::fromJson(responseData);
+        if (doc.isNull()) {
+            onError("无法解析API返回的数据");
+            return;
+        }
+
+        QJsonObject root = doc.object();
+        if (!root.contains("choices") || root["choices"].toArray().isEmpty()) {
+            onError("API返回格式不正确");
+            return;
+        }
+
+        QJsonArray choices = root["choices"].toArray();
+        QJsonObject firstChoice = choices[0].toObject();
+        if (!firstChoice.contains("message") || !firstChoice["message"].toObject().contains("content")) {
+            onError("API返回格式缺少内容");
+            return;
+        }
+
+QString jsonText = firstChoice["message"].toObject()["content"].toString();
+        onSuccess(jsonText);
+    });
+}
+
+void DashboardPage::callVisionAPI(VisionModelType model, const QString& apiKey, const QString& imagePath)
+{
     if (!m_networkManager) {
         m_networkManager = new QNetworkAccessManager(this);
     }
 
-    QNetworkReply* reply = m_networkManager->post(request, jsonData);
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
-        onGeminiReplyFinished(reply);
-    });
+    ScheduleVisionParser* parser = nullptr;
+    if (model == VisionModelType::Gemini) {
+        parser = new GeminiParser();
+    } else {
+        parser = new DoubaoParser();
+    }
+
+    parser->parseImage(imagePath, apiKey, m_networkManager,
+        [this](const QString& jsonText) {
+            m_lastResponse = jsonText;
+            onVisionReplyFinished(nullptr);
+        },
+        [this](const QString& errorMsg) {
+            if (m_loadingDialog) {
+                m_loadingDialog->close();
+                m_loadingDialog->deleteLater();
+                m_loadingDialog = nullptr;
+            }
+            QMessageBox::warning(this, "导入失败", errorMsg);
+        });
+
+    delete parser;
 }
 
-void DashboardPage::onGeminiReplyFinished(QNetworkReply* reply)
+void DashboardPage::onVisionReplyFinished(QNetworkReply* reply)
 {
     if (m_loadingDialog) {
         m_loadingDialog->close();
@@ -1660,42 +1868,11 @@ void DashboardPage::onGeminiReplyFinished(QNetworkReply* reply)
         m_loadingDialog = nullptr;
     }
 
-    if (reply->error() != QNetworkReply::NoError) {
-        QMessageBox::warning(this, "导入失败", QString("API请求失败: %1").arg(reply->errorString()));
+    if (reply != nullptr) {
         reply->deleteLater();
-        return;
     }
 
-    QByteArray responseData = reply->readAll();
-    reply->deleteLater();
-
-    QJsonDocument doc = QJsonDocument::fromJson(responseData);
-    if (doc.isNull()) {
-        QMessageBox::warning(this, "导入失败", "无法解析API返回的数据");
-        return;
-    }
-
-    QJsonObject root = doc.object();
-    if (!root.contains("candidates") || root["candidates"].toArray().isEmpty()) {
-        QMessageBox::warning(this, "导入失败", "API返回格式不正确");
-        return;
-    }
-
-    QJsonArray candidates = root["candidates"].toArray();
-    QJsonObject firstCandidate = candidates[0].toObject();
-    if (!firstCandidate.contains("content") || !firstCandidate["content"].toObject().contains("parts")) {
-        QMessageBox::warning(this, "导入失败", "API返回格式缺少内容");
-        return;
-    }
-
-    QJsonObject content = firstCandidate["content"].toObject();
-    QJsonArray parts = content["parts"].toArray();
-    if (parts.isEmpty()) {
-        QMessageBox::warning(this, "导入失败", "API返回没有内容");
-        return;
-    }
-
-    QString jsonText = parts[0].toObject()["text"].toString();
+    QString jsonText = m_lastResponse;
 
     jsonText = jsonText.trimmed();
     if (jsonText.startsWith("```")) {
