@@ -72,11 +72,13 @@ public slots:
     void applyCourseUpdate(const Course& updatedCourse);
     void refreshCourseUrgency();
     void importSchedule();
+    void importFromTeachingPlatform();
     void parseTimeString(const QString& timeStr, Course& c);
 
 signals:
     void navigateToTodoPageRequested();
     void openCourseDetail(const Course& course);
+    void importFromTeachingPlatformRequested();
 
 private:
     IConfigProvider *m_configProvider; // not owned

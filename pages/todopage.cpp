@@ -6,6 +6,7 @@
 #include "../dialogs/taskeditdialog.h"
 #include "../dialogs/confirmdialog.h"
 #include "../ui/theme.h"
+#include "../services/teachingplatformservice.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -178,6 +179,8 @@ TodoPage::TodoPage(QWidget *parent)
     boardLayout->setSpacing(12);
     scrollArea->setWidget(boardWidget);
     mainLayout->addWidget(scrollArea, 1);
+
+    setupUI();
 
     emptyStateWidget = new EmptyStateWidget;
     emptyStateWidget->setContent("🎉", "今日没有待办", "去未名湖散步吧");
@@ -633,4 +636,16 @@ void TodoPage::editTaskByIndex(int sourceIndex)
 void TodoPage::highlightTask(int taskIndex)
 {
     refreshTasks();
+}
+
+void TodoPage::setupUI() {
+    QPushButton *syncButton = new QPushButton("Sync Tasks from Teaching Platform");
+    connect(syncButton, &QPushButton::clicked, this, [this]() {
+        TeachingPlatformService *service = new TeachingPlatformService(this);
+        connect(service, &TeachingPlatformService::tasksFetched, this, [this](const QList<QJsonObject> &tasks) {
+            DataManager::instance().updateTasksFromPlatform(tasks);
+        });
+        service->fetchTodoTasks();
+    });
+    boardLayout->addWidget(syncButton);
 }

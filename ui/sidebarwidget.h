@@ -17,6 +17,7 @@ public:
 signals:
     void pageChanged(int index);
     void mascotClicked();
+    void connectTeachingPlatformRequested();
 
 public slots:
     void onMascotClicked() { emit mascotClicked(); }
@@ -32,6 +33,7 @@ private:
     QPushButton *btnTodo = nullptr;
     QPushButton *btnStats = nullptr;
     QPushButton *btnSettings = nullptr;
+    QPushButton *btnConnect = nullptr;
 };
 
 #endif

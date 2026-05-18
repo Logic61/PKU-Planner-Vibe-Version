@@ -527,6 +527,29 @@ QFrame* SettingsPage::createDataCard()
     connect(backupBtn, &QPushButton::clicked, this, &SettingsPage::backupData);
     btnGrid->addWidget(backupBtn, 1, 1);
 
+    QPushButton *syncTodoBtn = new QPushButton("🌐 从教学网导入待办", this);
+    syncTodoBtn->setCursor(Qt::PointingHandCursor);
+    syncTodoBtn->setStyleSheet(QString(
+        "QPushButton{"
+        "background:%1;"
+        "color:white;"
+        "border:none;"
+        "border-radius:14px;"
+        "padding:16px 12px;"
+        "font-size:14px;"
+        "font-weight:600;"
+        "}"
+        "QPushButton:hover{"
+        "background:%2;"
+        "}"
+    ).arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+
+    connect(syncTodoBtn, &QPushButton::clicked, this, [this]() {
+        emit syncTodosFromTeachingPlatformRequested();
+    });
+
+    btnGrid->addWidget(syncTodoBtn, 2, 0, 1, 2);
+
     v->addLayout(btnGrid);
 
     v->addSpacing(12);
