@@ -250,6 +250,8 @@ DashboardPage::DashboardPage(IConfigProvider *configProvider, QWidget *parent)
     connect(&DataManager::instance(), &DataManager::coursesChanged, this, &DashboardPage::updateBottomStats);
     connect(&DataManager::instance(), &DataManager::tasksChanged, this, &DashboardPage::updateBottomStats);
     connect(&DataManager::instance(), &DataManager::tasksChanged, this, &DashboardPage::updateDDLWidget);
+    connect(&DataManager::instance(), &DataManager::coursesChanged, this, &DashboardPage::updateSuggestionCard);
+    connect(&DataManager::instance(), &DataManager::tasksChanged, this, &DashboardPage::updateSuggestionCard);
 
     // Connect to config provider for semester changes
     connect(&ConfigService::instance(), &ConfigService::configChanged, this, [this](){ updateWeekInfo(false); });
@@ -602,7 +604,8 @@ QWidget* DashboardPage::createRightPanel()
 
     layout->addWidget(todayCard);
     layout->addWidget(ddlCard);
-    layout->addWidget(createSuggestionCard());
+    m_suggestionCard = createSuggestionCard();
+    layout->addWidget(m_suggestionCard);
     layout->addStretch();
 
     return widget;
@@ -1311,7 +1314,77 @@ QWidget* DashboardPage::createSuggestionCard()
         layout->addWidget(empty);
     }
 
+    m_suggestionCard = card;
     return card;
+}
+
+void DashboardPage::updateSuggestionCard()
+{
+    if (!m_suggestionCard) return;
+    QLayout *lay = m_suggestionCard->layout();
+    if (!lay) return;
+
+    while (lay->count() > 1) {
+        QLayoutItem *child = lay->takeAt(1);
+        if (child->widget()) child->widget()->deleteLater();
+        delete child;
+    }
+
+    const auto& tasks = DataManager::instance().tasks();
+    const auto courses = DataManager::instance().courses();
+    QDateTime now = QDateTime::currentDateTime();
+
+    int overdueCount = 0;
+    for (const Task& t : tasks) {
+        if (t.isOverdue()) overdueCount++;
+    }
+    if (overdueCount > 0) {
+        QLabel *tip = new QLabel(QString("⚠ %1个逾期任务需处理").arg(overdueCount));
+        tip->setStyleSheet(QString("color:%1;font-size:12px;padding:8px;background:%2;border-radius:8px;").arg(Theme::DANGER).arg(Theme::PRIMARY_LIGHT));
+        lay->addWidget(tip);
+    }
+
+    QMap<QString, int> courseTaskCount;
+    for (const Task& t : tasks) {
+        if (!t.completed) courseTaskCount[t.course]++;
+    }
+    for (auto it = courseTaskCount.constBegin(); it != courseTaskCount.constEnd(); ++it) {
+        if (it.value() >= 3) {
+            QLabel *tip = new QLabel(QString("📚 %1 有%2个待办").arg(it.key()).arg(it.value()));
+            tip->setStyleSheet(QString("color:%1;font-size:12px;padding:8px;background:%2;border-radius:8px;").arg(Theme::WARNING).arg("#FFF8E1"));
+            lay->addWidget(tip);
+            break;
+        }
+    }
+
+    int urgentCount = 0;
+    for (const Task& t : tasks) {
+        if (!t.completed && t.daysLeft() >= 0 && t.daysLeft() <= 2) urgentCount++;
+    }
+    if (urgentCount > 0) {
+        QLabel *tip = new QLabel(QString("⏰ %1个任务即将到期").arg(urgentCount));
+        tip->setStyleSheet(QString("color:%1;font-size:12px;padding:8px;background:#FFF3E0;border-radius:8px;").arg(Theme::WARNING));
+        lay->addWidget(tip);
+    }
+
+    int total = tasks.size();
+    int completed = 0;
+    for (const Task& t : tasks) {
+        if (t.completed) completed++;
+    }
+    double rate = total > 0 ? completed * 100.0 / total : 0;
+    if (total > 5 && rate >= 80) {
+        QLabel *tip = new QLabel(QString("🎉 完成率%1%，继续保持！").arg(qRound(rate)));
+        tip->setStyleSheet(QString("color:%1;font-size:12px;padding:8px;background:#E8F5E9;border-radius:8px;").arg(Theme::SUCCESS));
+        lay->addWidget(tip);
+    }
+
+    if (lay->count() == 1) {
+        QLabel *empty = new QLabel("先添加课程和任务\n系统将生成建议");
+        empty->setStyleSheet(QString("color:%1;font-size:12px;").arg(Theme::TEXT_TERTIARY));
+        empty->setAlignment(Qt::AlignCenter);
+        lay->addWidget(empty);
+    }
 }
 
 void DashboardPage::importSchedule()

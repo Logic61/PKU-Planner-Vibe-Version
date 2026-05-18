@@ -105,11 +105,13 @@ private:
 
     QVBoxLayout *ddlLayout;
     QVBoxLayout *todayCourseLayout = nullptr;
+    QWidget *m_suggestionCard = nullptr;
     QLabel *todayCourseValue = nullptr;
     QLabel *todayDdlValue = nullptr;
     QLabel *weekDdlValue = nullptr;
 
     void updateDDLWidget();
+    void updateSuggestionCard();
     void updateTodayCourses();
     void updateWeekInfo(bool useCurrentWeek = false);
     QWidget* createSuggestionCard();
