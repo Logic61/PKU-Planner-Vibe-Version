@@ -112,12 +112,16 @@ set(PROJECT_SOURCES
     services/weeklysummaryservice.h
     dialogs/confirmdialog.cpp
     dialogs/confirmdialog.h
+    dialogs/logindialog.cpp
+    dialogs/logindialog.h
     widgets/search/searchpopup.cpp
     widgets/search/searchpopup.h
     widgets/dialogs/weeklysummarydialog.cpp
     widgets/dialogs/weeklysummarydialog.h
     widgets/onboarding/onboardingdialog.cpp
     widgets/onboarding/onboardingdialog.h
+    services/teachingplatformservice.cpp
+    services/teachingplatformservice.h
 )
 
 qt_add_executable(PKUPlanner

@@ -1333,13 +1333,21 @@ void DashboardPage::importSchedule()
 
     QPushButton *imageBtn = msgBox.addButton("图片导入", QMessageBox::ActionRole);
     QPushButton *csvBtn = msgBox.addButton("CSV/TXT导入", QMessageBox::ActionRole);
+    QPushButton *portalBtn = msgBox.addButton("从教学网导入", QMessageBox::ActionRole);
     QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::RejectRole);
 
     imageBtn->setCursor(Qt::PointingHandCursor);
     csvBtn->setCursor(Qt::PointingHandCursor);
+    portalBtn->setCursor(Qt::PointingHandCursor);
     cancelBtn->setCursor(Qt::PointingHandCursor);
 
     msgBox.exec();
+
+    if (msgBox.clickedButton() == portalBtn) {
+        // Emit signal so MainWindow can handle importing via TeachingPlatformService
+        emit importFromTeachingPlatformRequested();
+        return;
+    }
 
     if (msgBox.clickedButton() == imageBtn) {
         importFromImage();
@@ -1951,4 +1959,10 @@ void DashboardPage::onVisionReplyFinished(QNetworkReply* reply)
 
     QMessageBox::information(this, "导入成功", QString("成功导入 %1 门课程").arg(importedCourses.size()));
     renderCourses();
+}
+
+void DashboardPage::importFromTeachingPlatform()
+{
+    // Emit the request signal so MainWindow can handle the import via TeachingPlatformService
+    emit importFromTeachingPlatformRequested();
 }
