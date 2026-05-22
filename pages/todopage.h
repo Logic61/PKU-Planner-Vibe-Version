@@ -21,6 +21,7 @@ public:
 public slots:
     void reloadTasks();
     void highlightTask(int taskIndex);
+    void setupUI();
 
 private:
     QComboBox *courseFilter = nullptr;

@@ -72,11 +72,13 @@ public slots:
     void applyCourseUpdate(const Course& updatedCourse);
     void refreshCourseUrgency();
     void importSchedule();
+    void importFromTeachingPlatform();
     void parseTimeString(const QString& timeStr, Course& c);
 
 signals:
     void navigateToTodoPageRequested();
     void openCourseDetail(const Course& course);
+    void importFromTeachingPlatformRequested();
 
 private:
     IConfigProvider *m_configProvider; // not owned
@@ -103,11 +105,13 @@ private:
 
     QVBoxLayout *ddlLayout;
     QVBoxLayout *todayCourseLayout = nullptr;
+    QWidget *m_suggestionCard = nullptr;
     QLabel *todayCourseValue = nullptr;
     QLabel *todayDdlValue = nullptr;
     QLabel *weekDdlValue = nullptr;
 
     void updateDDLWidget();
+    void updateSuggestionCard();
     void updateTodayCourses();
     void updateWeekInfo(bool useCurrentWeek = false);
     QWidget* createSuggestionCard();

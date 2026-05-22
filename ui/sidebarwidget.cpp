@@ -96,6 +96,25 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     layout->addWidget(btnTodo);
     layout->addWidget(btnStats);
     layout->addWidget(btnSettings);
+
+    btnConnect = new QPushButton("连接教学网");
+    QString connectStyle = QString(R"(
+        QPushButton {
+            background: transparent;
+            border: 1px dashed rgba(255,255,255,0.18);
+            border-radius: 12px;
+            padding: 10px;
+            color: white;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: rgba(255,255,255,0.04);
+        }
+    )");
+    btnConnect->setStyleSheet(connectStyle);
+    btnConnect->setCursor(Qt::PointingHandCursor);
+    layout->addWidget(btnConnect);
+
     layout->addStretch();
 
     QFrame *mascotContainer = new QFrame(this);

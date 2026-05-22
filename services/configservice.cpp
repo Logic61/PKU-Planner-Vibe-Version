@@ -26,6 +26,8 @@ ConfigService::ConfigService()
     , m_semesterStart(QDate(2026, 3, 1))
     , m_semesterEnd(QDate(2026, 6, 28))
     , m_lastSummaryDate()
+    , m_teachingUsername("")
+    , m_teachingPassword("")
 {
     load();
 }
@@ -69,6 +71,8 @@ void ConfigService::load()
     m_detailDrawerMode = obj.value("detailDrawerMode").toBool(true);
     m_exportPath = obj.value("exportPath").toString("");
     m_onboardingShown = obj.value("onboardingShown").toBool(false);
+    m_teachingUsername = obj.value("teachingUsername").toString("");
+    m_teachingPassword = obj.value("teachingPassword").toString("");
 
     QString startStr = obj.value("semesterStart").toString();
     QString endStr = obj.value("semesterEnd").toString();
@@ -103,6 +107,8 @@ void ConfigService::save()
     if (m_lastSummaryDate.isValid()) {
         obj["lastSummaryDate"] = m_lastSummaryDate.toString("yyyy-MM-dd");
     }
+    obj["teachingUsername"] = m_teachingUsername;
+    obj["teachingPassword"] = m_teachingPassword;
 
     QJsonDocument doc(obj);
 

@@ -126,6 +126,63 @@ void DataManager::markTaskCompleted(int index, bool completed)
     }
 }
 
+
+void DataManager::updateTasksFromPlatform(const QList<QJsonObject> &tasks) {
+    for (const QJsonObject &taskJson : tasks) {
+        Task newTask;
+
+        // Title: try common keys
+        QString title = taskJson.value("title").toString();
+        if (title.isEmpty()) title = taskJson.value("name").toString();
+        if (title.isEmpty()) title = taskJson.value("summary").toString();
+        newTask.title = title;
+
+        // Course: try multiple possible keys, provide fallback
+        QString course = taskJson.value("course").toString();
+        if (course.isEmpty()) course = taskJson.value("courseName").toString();
+        if (course.isEmpty()) course = taskJson.value("class").toString();
+        if (course.isEmpty()) course = taskJson.value("course_title").toString();
+        if (course.isEmpty()) course = QStringLiteral("未知课程");
+        newTask.course = course;
+
+        // Deadline: try common keys and parse ISO date; leave invalid if not provided
+        QString dl = taskJson.value("deadline").toString();
+        if (dl.isEmpty()) dl = taskJson.value("dueDate").toString();
+        if (dl.isEmpty()) dl = taskJson.value("endTime").toString();
+        if (!dl.isEmpty()) {
+            QDateTime dt = QDateTime::fromString(dl, Qt::ISODate);
+            if (!dt.isValid()) {
+                // Try common alternative formats
+                dt = QDateTime::fromString(dl, Qt::TextDate);
+            }
+            newTask.deadline = dt;
+        } else {
+            newTask.deadline = QDateTime();
+        }
+
+        // Priority and completion
+        newTask.priority = taskJson.value("priority").toInt(0);
+        newTask.completed = taskJson.value("completed").toBool(false);
+        if (newTask.completed) {
+            QString cat = taskJson.value("completedAt").toString();
+            newTask.completedAt = QDateTime::fromString(cat, Qt::ISODate);
+            if (!newTask.completedAt.isValid()) newTask.completedAt = QDateTime::currentDateTime();
+        } else {
+            newTask.completedAt = QDateTime();
+        }
+
+        if (newTask.title.isEmpty()) {
+            qWarning() << "[DataManager] Task missing title, skipping object:" << taskJson;
+            continue;
+        }
+
+        m_store.addTask(newTask);
+    }
+    emit tasksChanged();
+    m_repository.saveTasks(m_store.tasks());
+}
+
+
 void DataManager::clearAll()
 {
     m_store.clear();

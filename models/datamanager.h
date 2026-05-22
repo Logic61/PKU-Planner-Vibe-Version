@@ -26,6 +26,7 @@ public:
     void updateTask(int index, const Task& t);
     void deleteTask(int index);
     void markTaskCompleted(int index, bool completed);
+    void updateTasksFromPlatform(const QList<QJsonObject> &tasks);
 
     bool load();
     bool save();

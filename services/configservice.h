@@ -44,6 +44,11 @@ public:
     void resetAllData();
 
     QString getDataPath() const;
+    QString getTeachingUsername() const { return m_teachingUsername; }
+    QString getTeachingPassword() const { return m_teachingPassword; }
+    void setTeachingUsername(const QString &u) { m_teachingUsername = u; save(); emit configChanged(); }
+    void setTeachingPassword(const QString &p) { m_teachingPassword = p; save(); emit configChanged(); }
+
 
     void onConfigChanged() override { emit configChanged(); }
 
@@ -63,6 +68,8 @@ private:
     QDate m_semesterStart;
     QDate m_semesterEnd;
     QDate m_lastSummaryDate;
+    QString m_teachingUsername;
+    QString m_teachingPassword;
 };
 
 #endif

@@ -20,6 +20,9 @@ class SettingsPage : public QWidget
 public:
     explicit SettingsPage(QWidget *parent = nullptr);
 
+signals:
+    void syncTodosFromTeachingPlatformRequested();
+
 private:
     QCheckBox *reminderCheck;
     QComboBox *reminderInterval;

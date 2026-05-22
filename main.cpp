@@ -21,7 +21,9 @@ static void ensureDataFiles()
     configDefault["onboardingShown"] = false;
     configDefault["semesterStart"] = QDate::currentDate().toString("yyyy-MM-dd");
     configDefault["semesterEnd"] = QDate::currentDate().addMonths(4).toString("yyyy-MM-dd");
-
+    configDefault["teachingUsername"] = "";
+    configDefault["teachingPassword"] = "";
+    
     QStringList files = {"courses.json", "tasks.json", "config.json"};
     QList<QJsonObject> defaults = {QJsonObject(), QJsonObject(), configDefault};
 

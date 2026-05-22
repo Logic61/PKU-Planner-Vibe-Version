@@ -15,6 +15,8 @@ class MascotWidget;
 class IConfigProvider;
 #include "models/course.h"
 #include "services/iconfigprovider.h"
+#include <QJsonObject>
+
 
 class MainWindow : public QMainWindow
 {
@@ -24,8 +26,13 @@ public:
 
 protected:
     bool eventFilter(QObject *obj, QEvent *event) override;
+    void handleSyncTodosFromTeachingPlatform();
 
 private slots:
+    void promptTeachingPlatformLogin(bool importCourseAfterLogin = false, bool syncTasksAfterLogin = false);
+    void handleImportFromTeachingPlatform();
+    void handleCourseTableFetched(const QJsonObject &data);
+    void handleCourseTableFetchFailed(const QString &err);
     void initPages();
     void onNavigateToTodoPage();
     void showCourseDrawer(const Course& course);
@@ -44,6 +51,7 @@ private:
     TodoPage *todoPage = nullptr;
     CourseDetailDrawer *courseDrawer = nullptr;
     MascotWidget *mascotWidget = nullptr;
+    class TeachingPlatformService *teachingService = nullptr;
     QShortcut *searchShortcut = nullptr;
     bool pagesInitialized = false;
     QString searchCourseName;
