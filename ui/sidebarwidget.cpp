@@ -7,6 +7,8 @@
 #include <QTimer>
 #include <QMouseEvent>
 #include <QDebug>
+#include <QDir>
+#include <QCoreApplication>
 #include "../widgets/mascot/mascotwidget.h"
 #include "../services/mascotstateservice.h"
 
@@ -133,17 +135,35 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     mascotLabel->setMouseTracking(true);
 
     auto loadMascotImage = [&](MascotState state) {
-        QString imagePath = QString("C:/Users/32372/Desktop/Course-Helper/image/%1.png").arg((int)state);
+        // 1. 获取当前程序可执行文件所在的目录
+        QString appDirPath = QCoreApplication::applicationDirPath();
+        QString imagePath = QDir::cleanPath(appDirPath + "/image/%1.png").arg((int)state);
         qDebug() << "[Sidebar] Loading mascot image:" << imagePath;
         QPixmap pix(imagePath);
+
         if (!pix.isNull()) {
-            mascotLabel->setPixmap(pix);
-            qDebug() << "[Sidebar] Mascot image loaded successfully";
+            // 1. 获取 mascotLabel 当前的实际大小
+            QSize labelSize = mascotLabel->size();
+
+            // 2. 核心步骤：按比例缩放图片
+            // Qt::KeepAspectRatio 保证宽高比不被破坏
+            // Qt::SmoothTransformation 保证缩放后的图片清晰、平滑（抗锯齿）
+            QPixmap scaledPix = pix.scaled(labelSize, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+
+            // 3. 将缩放好的图片设置给 Label
+            mascotLabel->setPixmap(scaledPix);
+
+            // 4. 让图片在 Label 中居中显示（如果比例不一致，会有留白）
+            mascotLabel->setAlignment(Qt::AlignCenter);
+
+            // 5. 确保关闭自动拉伸（虽然默认是 false，但显式声明更安全）
+            mascotLabel->setScaledContents(false);
+
+            qDebug() << "[Sidebar] Mascot image loaded and scaled successfully";
         } else {
             qDebug() << "[Sidebar] Mascot image failed to load";
         }
     };
-
     loadMascotImage(MascotStateService::instance().currentState());
 
     connect(&MascotStateService::instance(), &MascotStateService::stateChanged, this, [loadMascotImage](MascotState state) {
