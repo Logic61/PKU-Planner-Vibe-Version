@@ -23,6 +23,7 @@ signals:
 private:
     QTimer *m_timer;
     bool m_running;
+    QSet<QString> m_notifiedTasks; // track "course::title" to avoid duplicate reminders
 };
 
 #endif

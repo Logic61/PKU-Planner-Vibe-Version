@@ -954,7 +954,7 @@ void SettingsPage::editSemester()
         }
         QPushButton:hover {background:%2;}
     )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
-    connect(saveBtn, &QPushButton::clicked, [=]() {
+    connect(saveBtn, &QPushButton::clicked, [startEdit, endEdit, dialog]() {
         ConfigService::instance().setSemesterStart(startEdit->date());
         ConfigService::instance().setSemesterEnd(endEdit->date());
         dialog->accept();
@@ -971,21 +971,7 @@ void SettingsPage::editSemester()
 
 void SettingsPage::openDocs()
 {
-    QString appPath = QCoreApplication::applicationDirPath();
-    QString readmePath = QDir(appPath).absoluteFilePath("README.md");
-
-    if (!QFile::exists(readmePath)) {
-        readmePath = QDir(QCoreApplication::applicationDirPath()).absoluteFilePath("..") + "/README.md";
-    }
-    if (!QFile::exists(readmePath)) {
-        readmePath = QCoreApplication::applicationDirPath() + "/README.md";
-    }
-
-    if (QFile::exists(readmePath)) {
-        QDesktopServices::openUrl(QUrl::fromLocalFile(readmePath));
-    } else {
-        QMessageBox::information(this, "提示", "使用说明文档未找到，请访问项目主页获取帮助");
-    }
+    QDesktopServices::openUrl(QUrl("https://github.com/Logic61/PKU-Planner/blob/main/README.md"));
 }
 
 void SettingsPage::backupData()
@@ -1063,90 +1049,7 @@ void SettingsPage::factoryReset()
 
 void SettingsPage::openFeedback()
 {
-    QDialog *dialog = new QDialog(this);
-    dialog->setWindowTitle("反馈");
-    dialog->setMinimumWidth(450);
-
-    QVBoxLayout *v = new QVBoxLayout(dialog);
-    v->setSpacing(16);
-
-    QLabel *title = new QLabel("提交反馈", dialog);
-    title->setStyleSheet("font-size:18px;font-weight:600;");
-    v->addWidget(title);
-
-    QLabel *hint = new QLabel("请描述您遇到的问题或建议：", dialog);
-    hint->setStyleSheet("font-size:14px;color:#666;");
-    v->addWidget(hint);
-
-    QTextEdit *feedbackEdit = new QTextEdit(dialog);
-    feedbackEdit->setPlaceholderText("在这里输入您的反馈...");
-    feedbackEdit->setMinimumHeight(150);
-    feedbackEdit->setStyleSheet(R"(
-        QTextEdit {
-            border:1px solid #DDD;
-            border-radius:8px;
-            padding:12px;
-            font-size:14px;
-        }
-    )");
-    v->addWidget(feedbackEdit);
-
-    v->addSpacing(8);
-
-    QHBoxLayout *btnRow = new QHBoxLayout;
-    btnRow->addStretch();
-
-    QPushButton *cancelBtn = new QPushButton("取消", dialog);
-    cancelBtn->setStyleSheet(R"(
-        QPushButton {
-            background:white;
-            color:#666;
-            border:1px solid #DDD;
-            border-radius:12px;
-            padding:12px 24px;
-            font-size:14px;
-        }
-        QPushButton:hover {background:#F5F5F5;}
-    )");
-    connect(cancelBtn, &QPushButton::clicked, dialog, &QDialog::reject);
-    btnRow->addWidget(cancelBtn);
-
-    QPushButton *submitBtn = new QPushButton("提交", dialog);
-    submitBtn->setStyleSheet(QString(R"(
-        QPushButton {
-            background:%1;
-            color:white;
-            border:none;
-            border-radius:12px;
-            padding:12px 24px;
-            font-size:14px;
-            font-weight:600;
-        }
-        QPushButton:hover {background:%2;}
-    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
-    connect(submitBtn, &QPushButton::clicked, [=]() {
-        QString feedback = feedbackEdit->toPlainText().trimmed();
-        if (feedback.isEmpty()) {
-            QMessageBox::warning(dialog, "提示", "请输入反馈内容");
-            return;
-        }
-        QFile feedbackFile(QCoreApplication::applicationDirPath() + "/feedback.txt");
-        if (feedbackFile.open(QIODevice::Append | QIODevice::Text)) {
-            QTextStream out(&feedbackFile);
-            out << QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss") << "\n";
-            out << feedback << "\n";
-            out << "---\n";
-            feedbackFile.close();
-        }
-        ToastWidget::showToast(this, "感谢您的反馈！", 3000);
-        dialog->accept();
-    });
-    btnRow->addWidget(submitBtn);
-
-    v->addLayout(btnRow);
-
-    dialog->exec();
-    delete dialog;
+    QDesktopServices::openUrl(QUrl("https://github.com/Logic61/PKU-Planner/issues"));
 }
 
 void SettingsPage::updateSemesterDisplay()

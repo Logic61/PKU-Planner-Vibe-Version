@@ -132,7 +132,7 @@ void SearchPopup::addSection(const QString& title, const QString& icon, const QV
         
 connect(item, &ClickableFrame::clicked, this, [this, r]() {
             if (r.type == SearchResult::Course) emit courseSelected(r.id);
-            else if (r.type == SearchResult::Task) emit taskSelected(r.id.toInt());
+            else if (r.type == SearchResult::Task) emit taskSelectedByCourseAndTitle(r.id);
             else if (r.type == SearchResult::File) emit fileSelected(r.id);
         });
 
@@ -166,18 +166,20 @@ QString SearchPopup::highlightText(const QString& text, const QString& keyword)
 {
     if (keyword.isEmpty()) return text;
 
-    QString lowerText = text.toLower();
+    QString escaped = text;
+    escaped.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;");
+    QString lowerText = escaped.toLower();
     QString lowerKeyword = keyword.toLower();
 
     int index = lowerText.indexOf(lowerKeyword);
     if (index >= 0) {
-        QString before = text.left(index);
-        QString match = text.mid(index, keyword.length());
-        QString after = text.mid(index + keyword.length());
+        QString before = escaped.left(index);
+        QString match = escaped.mid(index, keyword.length());
+        QString after = escaped.mid(index + keyword.length());
         return before + "<span style=\"color:" + Theme::WARNING + ";font-weight:700;\">" + match + "</span>" + after;
     }
 
-    return text;
+    return escaped;
 }
 
 void SearchPopup::clearResults()

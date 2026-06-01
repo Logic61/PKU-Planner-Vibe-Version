@@ -43,7 +43,7 @@ public:
 
  signals:
     void courseSelected(const QString& courseName);
-    void taskSelected(int taskIndex);
+    void taskSelectedByCourseAndTitle(const QString& courseAndTitle);
     void fileSelected(const QString& filePath);
 
 private:

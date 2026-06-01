@@ -4,6 +4,7 @@
 #include <QFormLayout>
 #include <QVBoxLayout>
 #include <QFrame>
+#include <QMessageBox>
 
 CourseEditDialog::CourseEditDialog(int defaultStart, int defaultEnd, QWidget *parent)
     : QDialog(parent)
@@ -185,15 +186,22 @@ void CourseEditDialog::setCourseData(const QString &name, const QString &teacher
     examEdit->setText(examTime);
     startCombo->setCurrentIndex(start - 1);
     endCombo->setCurrentIndex(end - 1);
-    weekTypeCombo->setCurrentIndex(weekType);
+    weekTypeCombo->setCurrentIndex(qBound(0, weekType, 2));
 }
 
 void CourseEditDialog::onAccepted() {
     if (nameEdit->text().trimmed().isEmpty()) {
-        // 课程名称为空，显示错误提示
         nameEdit->setStyleSheet("border: 2px solid red; border-radius: 8px; padding: 8px;");
         nameEdit->setPlaceholderText("课程名称不能为空！");
         nameEdit->setFocus();
+        return;
+    }
+
+    int start = startCombo->currentIndex() + 1;
+    int end = endCombo->currentIndex() + 1;
+    if (start > end) {
+        QMessageBox::warning(this, "输入错误", "开始节次不能大于结束节次");
+        startCombo->setFocus();
         return;
     }
     // 验证通过，接受对话框

@@ -26,6 +26,7 @@
 #include "services/weeklysummaryservice.h"
 #include "services/teachingplatformservice.h"
 #include <QInputDialog>
+#include <algorithm>
 #include "components/toastwidget.h"
 #include "dialogs/logindialog.h"
 #include "services/configservice.h"
@@ -240,22 +241,12 @@ void MainWindow::promptTeachingPlatformLogin(bool importCourseAfterLogin, bool s
     connect(teachingService, &TeachingPlatformService::courseTableFetched, this, &MainWindow::handleCourseTableFetched);
     connect(teachingService, &TeachingPlatformService::courseTableFetchFailed, this, &MainWindow::handleCourseTableFetchFailed);
     connect(teachingService, &TeachingPlatformService::loginFailed, this, [this, username, password](const QString &err){
-        // if failure indicates OTP required, prompt for OTP and retry
         QString lerr = err.toLower();
-        if (lerr.contains("otp") || lerr.contains("e05")) {
-            LoginDialog otpDlg(this);
-            otpDlg.setUsername(username);
-            otpDlg.setPassword(password);
-            otpDlg.setOtpVisible(true);
-            if (otpDlg.exec() == QDialog::Accepted) {
-                QString otp2 = otpDlg.otp();
-                teachingService->login(username, password, otp2);
-                return;
-            }
-        }
+        bool otpRelated = lerr.contains("otp") || lerr.contains("e05");
+
         QMessageBox msgBox2(this);
         msgBox2.setWindowTitle("登录失败");
-        msgBox2.setText(QString("登录失败: %1").arg(err));
+        msgBox2.setText(QString("登录失败: %1%2").arg(err).arg(otpRelated ? "" : "\n\n是否重新输入账号密码？"));
         msgBox2.setIcon(QMessageBox::Warning);
         msgBox2.setStyleSheet(QString(
             "QMessageBox { background: white; border-radius: %1px; }"
@@ -267,7 +258,22 @@ void MainWindow::promptTeachingPlatformLogin(bool importCourseAfterLogin, bool s
             "QPushButton:hover { background: %3; color: white; }"
         ).arg(Theme::CARD_RADIUS).arg(Theme::TEXT_PRIMARY).arg(Theme::PRIMARY)
          .arg(Theme::BUTTON_RADIUS));
+        if (!otpRelated) {
+            msgBox2.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+            msgBox2.button(QMessageBox::Yes)->setText("重新输入");
+            msgBox2.button(QMessageBox::No)->setText("取消");
+        }
         msgBox2.exec();
+
+        if (otpRelated || msgBox2.clickedButton() == msgBox2.button(QMessageBox::Yes)) {
+            LoginDialog retryDlg(this);
+            retryDlg.setUsername(username);
+            retryDlg.setPassword(password);
+            retryDlg.setOtpVisible(otpRelated);
+            if (retryDlg.exec() == QDialog::Accepted) {
+                teachingService->login(retryDlg.username(), retryDlg.password(), retryDlg.otp());
+            }
+        }
     });
     connect(teachingService, &TeachingPlatformService::todoAuthRequired, this, [this](const QString &err) {
         LoginDialog dlg(this);
@@ -402,14 +408,22 @@ void MainWindow::onSearchCourseRequested(const QString& courseName)
     }
 }
 
-void MainWindow::onSearchTaskRequested(int taskIndex)
+void MainWindow::onSearchTaskRequested(const QString& courseAndTitle)
 {
     PageAnimator::slideToIndex(stack, 1);
     if (sidebar) {
         sidebar->setActivePage(1);
     }
     if (todoPage) {
-        QMetaObject::invokeMethod(todoPage, "highlightTask", Qt::QueuedConnection, Q_ARG(int, taskIndex));
+        // Find task by course+title and highlight it
+        const QList<Task> tasks = DataManager::instance().tasks();
+        for (int i = 0; i < tasks.size(); ++i) {
+            if (tasks[i].course == courseAndTitle.section("::", 0, 0) &&
+                tasks[i].title == courseAndTitle.section("::", 1)) {
+                QMetaObject::invokeMethod(todoPage, "highlightTask", Qt::QueuedConnection, Q_ARG(int, i));
+                break;
+            }
+        }
     }
 }
 
@@ -469,8 +483,13 @@ void MainWindow::handleSyncTodosFromTeachingPlatform()
 
 void MainWindow::handleCourseTableFetched(const QJsonObject &data)
 {
+    qWarning() << "[CourseImport] Full JSON:" << QJsonDocument(data).toJson(QJsonDocument::Compact);
+
     // parse portal JSON (structure: { "course": [ ... ] })
     if (!data.contains("course") || !data.value("course").isArray()) {
+        QJsonDocument doc(data);
+        qWarning() << "[CourseImport] Top-level keys:" << data.keys();
+        qWarning() << "[CourseImport] Raw JSON:" << doc.toJson(QJsonDocument::Indented);
         QMessageBox::warning(this, "导入失败", "课表数据结构不正确");
         return;
     }
@@ -478,26 +497,65 @@ void MainWindow::handleCourseTableFetched(const QJsonObject &data)
     QJsonArray courseSlots = data.value("course").toArray();
     QList<Course> imported;
     QStringList dayKeys = {"mon","tue","wed","thu","fri","sat","sun"};
+    QStringList dayKeysAlt = {"1","2","3","4","5","6","7"};
 
     for (int i = 0; i < courseSlots.size(); ++i) {
         QJsonValue slotVal = courseSlots.at(i);
-        if (!slotVal.isObject()) continue;
+        if (!slotVal.isObject()) {
+            qWarning() << "[CourseImport] Slot" << i << "not an object, type:" << slotVal.type();
+            continue;
+        }
 
         QJsonObject slotObj = slotVal.toObject();
-        int slotNum = i + 1; // period index
+        int slotNum = i + 1;
 
         for (int d = 0; d < dayKeys.size(); ++d) {
             QString dayKey = dayKeys[d];
 
-            if (!slotObj.contains(dayKey) || !slotObj.value(dayKey).isObject()) continue;
+            if (!slotObj.contains(dayKey) || !slotObj.value(dayKey).isObject()) {
+                if (slotObj.contains(dayKeysAlt[d]) && slotObj.value(dayKeysAlt[d]).isObject()) {
+                    dayKey = dayKeysAlt[d];
+                } else {
+                    continue;
+                }
+            }
 
             QJsonObject courseObj = slotObj.value(dayKey).toObject();
             QString rawName = courseObj.value("courseName").toString();
+            if (rawName.trimmed().isEmpty()) {
+                QStringList altNames = {"name","course_name","课程名称","kcmc","course","title","班级名称"};
+                for (const QString &n : altNames) {
+                    rawName = courseObj.value(n).toString().trimmed();
+                    if (!rawName.isEmpty()) break;
+                }
+            }
 
-            if (rawName.trimmed().isEmpty()) continue;
+            if (rawName.trimmed().isEmpty()) {
+                qWarning() << "[CourseImport] Slot" << slotNum << dayKey << "empty, obj keys:" << courseObj.keys();
+                continue;
+            }
+
+            // Clean rawName: strip HTML tags and decode entities
+            rawName.replace(QRegularExpression("<[^>]*>"), "");
+            rawName.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">");
+            rawName.replace("&quot;", "\"").replace("&#39;", "'").replace("&nbsp;", " ");
+            rawName = rawName.simplified();
+
+            qWarning() << "[CourseImport] Slot" << slotNum << dayKey << "cleaned:" << rawName;
+
+            // Also try to strip semester suffix like "（2024-2025学年第二学期）"
+            QRegularExpression semRe(R"(\s*[（(][^（）()]*((\d{2,4}\s*[-–—]\s*\d{2,4})|学年|学期|semester|term)[^（）()]*[）)]\s*$)",
+                                     QRegularExpression::CaseInsensitiveOption);
+            rawName.replace(semRe, "");
 
             Course c;
-            c.name = rawName.split("(主)").first().split("(辅双)").first().trimmed();
+            // Parse weekType from rawName before stripping markers
+            if (rawName.contains("(辅双)")) {
+                c.weekType = 2; // 双周
+            } else if (rawName.contains("(辅单)") || rawName.contains("(单)") || rawName.contains("单周")) {
+                c.weekType = 1; // 单周
+            }
+            c.name = rawName.split("(主)").first().split("(辅双)").first().split("(辅单)").first().split("(单)").first().trimmed();
             c.day = d + 1;
             c.startPeriod = slotNum;
             c.endPeriod = slotNum;
@@ -510,7 +568,10 @@ void MainWindow::handleCourseTableFetched(const QJsonObject &data)
                 int teacherPos = rest.indexOf("教师：");
                 QString classInfo = teacherPos >= 0 ? rest.left(teacherPos) : rest;
 
-                c.location = classInfo.split('\n').first().trimmed();
+                // Extract classroom name (e.g., 理教408, 二教405), discarding week range/frequency
+                QRegularExpression roomRe(QStringLiteral("([一二三四五]教\\d{2,4}|理教\\d{2,4}|文史(?:楼)?\\d{2,4}|理科教学楼\\d{2,4})"));
+                QRegularExpressionMatch rm = roomRe.match(classInfo);
+                c.location = rm.hasMatch() ? rm.captured(1) : QString();
 
                 if (teacherPos >= 0) {
                     QString teacherPart = rest.mid(teacherPos + QString("教师：").length());
@@ -519,8 +580,106 @@ void MainWindow::handleCourseTableFetched(const QJsonObject &data)
                 }
             }
 
+            // 解析备注中的习题课/实验课/讨论课（类似图片导入的 AI 行为）
+            if (rawName.contains("备注：")) {
+                int bzPos = rawName.indexOf("备注：");
+                QString remark = rawName.mid(bzPos + 3).trimmed();
+
+                QString suffix;
+                if (remark.contains("习题课")) suffix = "习题课";
+                else if (remark.contains("实验课")) suffix = "实验课";
+                else if (remark.contains("讨论课")) suffix = "讨论课";
+
+                if (!suffix.isEmpty()) {
+                    struct { QString name; int val; } dayMap[] = {
+                        {"周一",1},{"周二",2},{"周三",3},{"周四",4},{"周五",5},{"周六",6},{"周日",7},
+                        {"星期一",1},{"星期二",2},{"星期三",3},{"星期四",4},{"星期五",5},{"星期六",6},{"星期日",7},
+                        {"礼拜一",1},{"礼拜二",2},{"礼拜三",3},{"礼拜四",4},{"礼拜五",5},{"礼拜六",6},{"礼拜日",7},
+                        {"一",1},{"二",2},{"三",3},{"四",4},{"五",5},{"六",6},{"日",7},
+                    };
+
+                    int foundDay = -1;
+                    for (const auto &entry : dayMap) {
+                        if (remark.contains(entry.name)) {
+                            foundDay = entry.val;
+                            break;
+                        }
+                    }
+
+                    int startP = -1, endP = -1;
+                    QRegularExpression periodRe(R"((\d+)\s*[-—,、~]\s*(\d+)\s*节)");
+                    auto pm = periodRe.match(remark);
+                    if (pm.hasMatch()) {
+                        startP = pm.captured(1).toInt();
+                        endP = pm.captured(2).toInt();
+                    }
+
+                    int weekT = 0;
+                    if (remark.contains("单周")) weekT = 1;
+                    else if (remark.contains("双周")) weekT = 2;
+
+                    if (foundDay > 0 && startP > 0 && endP > 0) {
+                        Course extra;
+                        extra.name = c.name + suffix;
+                        extra.day = foundDay;
+                        extra.startPeriod = startP;
+                        extra.endPeriod = endP;
+                        extra.weekType = weekT;
+                        extra.teacher = c.teacher;
+
+                        QString locStr = remark;
+                        locStr.replace(QRegularExpression(R"((周|礼拜)[一二三四五六七日])"), "");
+                        locStr.replace(QRegularExpression(R"(\d+\s*[-—,、]\s*\d+\s*节)"), "");
+                        locStr.replace("单周", "").replace("双周", "").replace("每周", "");
+                        locStr.replace(suffix, "");
+                        locStr.replace("备注：", "").replace("备注", "");
+                        locStr = locStr.trimmed();
+                        // 只提取教室名（如二教102、理教207），丢弃其他说明文字
+                        if (!locStr.isEmpty()) {
+                            QRegularExpression roomRe(QStringLiteral("([一二三四五]教\\d{2,4}|理教\\d{2,4}|文史(?:楼)?\\d{2,4}|理科教学楼\\d{2,4})"));
+                            auto rm = roomRe.match(locStr);
+                            extra.location = rm.hasMatch() ? rm.captured(1) : QString();
+                        }
+
+                        imported.append(extra);
+                    }
+                }
+            }
+
             imported.append(c);
         }
+    }
+
+    // 合并相邻同名课程（教学网返回每节课一个slot，需合并为连续色块）
+    std::sort(imported.begin(), imported.end(), [](const Course &a, const Course &b) {
+        if (a.day != b.day) return a.day < b.day;
+        return a.startPeriod < b.startPeriod;
+    });
+    QList<Course> merged;
+    for (const Course &c : imported) {
+        if (!merged.isEmpty()) {
+            Course &last = merged.last();
+            if (last.day == c.day && last.name == c.name && last.endPeriod + 1 >= c.startPeriod) {
+                last.endPeriod = qMax(last.endPeriod, c.endPeriod);
+                if (c.teacher.length() > last.teacher.length()) last.teacher = c.teacher;
+                if (c.location.length() > last.location.length()) last.location = c.location;
+                // 单双周冲突：同一门课既有单周又有双周 → 每周
+                if (last.weekType != 0 && c.weekType != 0 && last.weekType != c.weekType) {
+                    last.weekType = 0;
+                } else if (last.weekType == 0 && c.weekType != 0) {
+                    last.weekType = c.weekType;
+                }
+                continue;
+            }
+        }
+        merged.append(c);
+    }
+    imported = merged;
+
+    qWarning() << "[CourseImport] Courses after merge:" << imported.size();
+    for (const Course &cc : imported) {
+        qWarning() << "  " << cc.name << "day=" << cc.day << "period=" << cc.startPeriod << "-" << cc.endPeriod
+                 << "loc=" << cc.location << "teacher=" << cc.teacher;
     }
 
     if (imported.isEmpty()) {
@@ -548,8 +707,10 @@ void MainWindow::handleCourseTableFetched(const QJsonObject &data)
         }
     }
 
+    qWarning() << "[CourseImport] Final import list:" << imported.size() << "courses";
     for (const Course &c : imported) {
         DataManager::instance().addCourse(c);
+        qWarning() << "[CourseImport] Added:" << c.name << "day=" << c.day << "period=" << c.startPeriod << "-" << c.endPeriod;
     }
 
     QMessageBox::information(this, "导入成功", QString("成功导入 %1 门课程").arg(imported.size()));

@@ -293,7 +293,9 @@ void CourseTaskPage::openEditTaskDialog(int sourceIndex)
         return;
     }
 
-    task.course = dialog.getCourseName();
+    QString newCourse = dialog.getCourseName();
+    if (newCourse == "请选择课程") newCourse = task.course; // reject placeholder
+    task.course = newCourse;
     task.title = dialog.getTitle();
     task.deadline = dialog.getDeadline();
     task.priority = dialog.getPriority();

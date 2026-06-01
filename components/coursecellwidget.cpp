@@ -96,7 +96,7 @@ CourseCellWidget::CourseCellWidget(int row, int col, QWidget *parent)
     });
 }
 
-void CourseCellWidget::setCourse(QString name, QString location, QString teacher, int index, int daysLeft, QString scheduleSummary)
+void CourseCellWidget::setCourse(QString name, QString location, QString teacher, int index, std::optional<int> daysLeft, QString scheduleSummary)
 {
     m_index = index;
     m_courseName = name;
@@ -115,21 +115,17 @@ void CourseCellWidget::setCourse(QString name, QString location, QString teacher
     QString border = "transparent";
     QString hoverBorder = "#4CAF50";
 
-    if (daysLeft != -999) {
-        if (daysLeft < 0) {
-            // 逾期：红色
+    if (daysLeft.has_value()) {
+        int d = daysLeft.value();
+        if (d < 0) {
             bg = "#FFCDD2"; hover = "#FFCDD2"; hoverBorder = "#D32F2F";
-        } else if (daysLeft == 0) {
-            // 今晚截止：橙色
+        } else if (d == 0) {
             bg = "#FFAB91"; hover = "#FFAB91"; hoverBorder = "#E64A19";
-        } else if (daysLeft <= 3) {
-            // 3天内：黄色
+        } else if (d <= 3) {
             bg = "#FFCC80"; hover = "#FFCC80"; hoverBorder = "#F57C00";
-        } else if (daysLeft <= 7) {
-            // 7天内：浅黄
+        } else if (d <= 7) {
             bg = "#FFF59D"; hover = "#FFF59D"; hoverBorder = "#FBC02D";
         } else {
-            // DDL不急（>7天）：蓝色系
             bg = "#E3F2FD"; hover = "#BBDEFB"; hoverBorder = "#1976D2";
         }
     }

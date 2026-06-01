@@ -14,9 +14,6 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # 为MSVC添加编译选项 - Qt6需要/permissive-
 if(MSVC)
     add_compile_options(/permissive- /Zc:__cplusplus /utf-8)
@@ -32,6 +29,9 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+
+# Release模式下禁用qDebug输出
+add_compile_definitions($<$<CONFIG:Release>:QT_NO_DEBUG_OUTPUT>)
 
 set(PROJECT_SOURCES
     main.cpp
@@ -72,13 +72,13 @@ set(PROJECT_SOURCES
     dialogs/taskeditdialog.h
     models/datamanager.cpp
     models/datamanager.h
-    models/datastore.cpp
     models/datastore.h
     models/datarepository.cpp
     models/datarepository.h
     models/taskmodel.cpp
     models/taskmodel.h
     models/task.h
+    resources.qrc
     models/course.h
     models/searchresult.h
     widgets/coursedetail/courseheaderwidget.cpp
@@ -141,6 +141,22 @@ else()
     )
 endif()
 
-file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/image DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-
 qt_finalize_executable(PKUPlanner)
+
+# =============================================================================
+# Smoke Tests
+# =============================================================================
+find_package(Qt6 COMPONENTS Test)
+if(Qt6Test_FOUND)
+    enable_testing()
+
+    add_executable(smoke_test
+        tests/smoke_test.cpp
+        models/datarepository.cpp
+        models/taskmodel.cpp
+        services/exportservice.cpp
+    )
+    target_link_libraries(smoke_test PRIVATE Qt6::Widgets Qt6::Network Qt6::Test)
+    target_include_directories(smoke_test PRIVATE ${CMAKE_SOURCE_DIR})
+    add_test(NAME smoke_test COMMAND smoke_test)
+endif()

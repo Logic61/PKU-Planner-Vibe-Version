@@ -236,7 +236,7 @@ QString TaskEditDialog::getCourseName() const {
 void TaskEditDialog::setTaskData(const Task &task) {
     titleEdit->setText(task.title);
     deadlineEdit->setDateTime(task.deadline);
-    priorityCombo->setCurrentIndex(task.priority);
+    priorityCombo->setCurrentIndex(qBound(0, task.priority, 2));
     completedCheck->setChecked(task.completed);
 
     const int index = courseCombo->findText(task.course);

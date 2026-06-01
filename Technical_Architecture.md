@@ -321,7 +321,7 @@ ReminderService::start() → m_timer 每分钟触发 checkUpcomingTasks()
 
 ---
 
-**本文档生成于 2026-05-11**，如需更新请在 `docs/` 目录下对应文件提交 PR。
+**本文档生成于 2026-05-11**。
 
 
 - Qt6 路径硬编码在 `CMakeLists.txt:6`，迁移环境需修改 `CMAKE_PREFIX_PATH`

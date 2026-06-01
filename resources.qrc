@@ -1,0 +1,8 @@
+<RCC>
+    <qresource prefix="/mascot">
+        <file alias="0">assets/image/0.png</file>
+        <file alias="1">assets/image/1.png</file>
+        <file alias="2">assets/image/2.png</file>
+        <file alias="3">assets/image/3.png</file>
+    </qresource>
+</RCC>

@@ -34,6 +34,7 @@ private:
     QScrollArea *scrollArea = nullptr;
     QWidget *boardWidget = nullptr;
     QVBoxLayout *boardLayout = nullptr;
+    QVBoxLayout *mainLayout = nullptr;
 
     QWidget* createFilterBar();
     QWidget* createSectionHeader(const QString &title, int count, const QString &accent);

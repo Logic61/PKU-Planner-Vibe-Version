@@ -44,24 +44,26 @@ CourseActionDialog::CourseActionDialog(QWidget *parent)
     QPushButton *editBtn=new QPushButton("编辑课程");
     QPushButton *deleteBtn=new QPushButton("删除课程");
     QPushButton *ddlBtn=new QPushButton("添加DDL");
+    QPushButton *cancelBtn=new QPushButton("取消");
 
     layout->addWidget(title);
     layout->addSpacing(20);
     layout->addWidget(editBtn);
     layout->addWidget(deleteBtn);
     layout->addWidget(ddlBtn);
+    layout->addWidget(cancelBtn);
 
-    connect(editBtn,&QPushButton::clicked,[=](){
+    connect(editBtn,&QPushButton::clicked,[this](){
         editChoice=true;
         accept();
     });
 
-    connect(deleteBtn,&QPushButton::clicked,[=](){
+    connect(deleteBtn,&QPushButton::clicked,[this](){
         deleteChoice=true;
         accept();
     });
 
-    connect(ddlBtn,&QPushButton::clicked,[=](){
+    connect(ddlBtn,&QPushButton::clicked,[this](){
         ddlChoice=true;
         accept();
     });

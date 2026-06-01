@@ -13,6 +13,7 @@ struct WeeklySummary {
     double completionRate;
     QString busiestCourse;
     int busiestCourseTasks;
+    int busiestCourseCompletedTasks;
     double avgEarlyDays;
     QString suggestion;
     QString mascotMessage;
@@ -28,6 +29,7 @@ private:
     static QDate getWeekStart(const QDate& date);
     static bool isThisWeek(const QDateTime& deadline);
     static QString generateSuggestion(int overdue, double rate, const QString& busiest);
+    static QString generateMascotMessage(int completed, int total, int overdue);
 };
 
 #endif

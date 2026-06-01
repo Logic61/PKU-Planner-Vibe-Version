@@ -1,6 +1,5 @@
 #pragma once
 
-#include <QObject>
 #include <QList>
 #include "course.h"
 #include "task.h"
@@ -21,30 +20,40 @@ public:
     virtual void markTaskCompleted(int index, bool completed) = 0;
 };
 
-class DataStore : public QObject, public IDataStore {
-    Q_OBJECT
+class DataStore : public IDataStore {
 public:
-    explicit DataStore(QObject *parent = nullptr);
-    // IDataStore implementation
-    QList<Course> courses() const override;
-    void addCourse(const Course& c) override;
-    void updateCourse(int index, const Course& c) override;
-    void deleteCourse(int index) override;
+    DataStore() = default;
 
-    QList<Task> tasks() const override;
-    void addTask(const Task& t) override;
-    void updateTask(int index, const Task& t) override;
-    void deleteTask(int index) override;
-    void markTaskCompleted(int index, bool completed) override;
+    // IDataStore implementation
+    QList<Course> courses() const { return m_courses; }
+    void addCourse(const Course& c) { m_courses.append(c); }
+    void updateCourse(int index, const Course& c) {
+        if (index >= 0 && index < m_courses.size()) {
+            m_courses[index] = c;
+        }
+    }
+    void deleteCourse(int index) {
+        if (index >= 0 && index < m_courses.size()) {
+            m_courses.removeAt(index);
+        }
+    }
+
+    QList<Task> tasks() const { return m_tasks; }
+    void addTask(const Task& t) { m_tasks.append(t); }
+    void updateTask(int index, const Task& t) {
+        if (index >= 0 && index < m_tasks.size()) { m_tasks[index] = t; }
+    }
+    void deleteTask(int index) {
+        if (index >= 0 && index < m_tasks.size()) { m_tasks.removeAt(index); }
+    }
+    void markTaskCompleted(int index, bool completed) {
+        if (index >= 0 && index < m_tasks.size()) { m_tasks[index].completed = completed; }
+    }
 
     // Additional methods used by DataManager
-    void clear() { m_courses.clear(); m_tasks.clear(); emit coursesChanged(); emit tasksChanged(); }
-    void setCourses(const QList<Course>& c) { m_courses = c; emit coursesChanged(); }
-    void setTasks(const QList<Task>& t) { m_tasks = t; emit tasksChanged(); }
-
-signals:
-    void coursesChanged();
-    void tasksChanged();
+    void clear() { m_courses.clear(); m_tasks.clear(); }
+    void setCourses(const QList<Course>& c) { m_courses = c; }
+    void setTasks(const QList<Task>& t) { m_tasks = t; }
 
 private:
     QList<Course> m_courses;

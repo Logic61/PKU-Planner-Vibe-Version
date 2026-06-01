@@ -87,7 +87,7 @@ TopbarWidget::TopbarWidget(QWidget *parent)
     connect(searchEdit, &QLineEdit::textChanged, this, &TopbarWidget::onSearchTextChanged);
     connect(searchEdit, &QLineEdit::returnPressed, this, &TopbarWidget::onSearchReturned);
     connect(searchPopup, &SearchPopup::courseSelected, this, &TopbarWidget::onCourseSelected);
-    connect(searchPopup, &SearchPopup::taskSelected, this, &TopbarWidget::onTaskSelected);
+    connect(searchPopup, &SearchPopup::taskSelectedByCourseAndTitle, this, &TopbarWidget::onTaskSelected);
     connect(searchPopup, &SearchPopup::fileSelected, this, &TopbarWidget::onFileSelected);
     connect(searchTimer, &QTimer::timeout, this, &TopbarWidget::doSearch);
 }
@@ -168,12 +168,12 @@ void TopbarWidget::onCourseSelected(const QString& courseName)
     emit searchCourseRequested(courseName);
 }
 
-void TopbarWidget::onTaskSelected(int taskIndex)
+void TopbarWidget::onTaskSelected(const QString& courseAndTitle)
 {
-    qDebug() << "[Topbar] Task selected index:" << taskIndex;
+    qDebug() << "[Topbar] Task selected:" << courseAndTitle;
     searchEdit->clear();
     searchPopup->hide();
-    emit searchTaskRequested(taskIndex);
+    emit searchTaskRequested(courseAndTitle);
 }
 
 void TopbarWidget::onFileSelected(const QString& filePath)

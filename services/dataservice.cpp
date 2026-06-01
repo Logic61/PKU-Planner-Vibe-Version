@@ -54,8 +54,8 @@ QJsonObject DataService::loadJson(const QString& path, const QJsonObject& defaul
             qDebug() << "[DataService] Reset to default data";
         }
 
-        QMetaObject::invokeMethod(QCoreApplication::instance(), "postEvent", Qt::QueuedConnection,
-            Q_ARG(QEvent*, nullptr));
+        // Removed: QMetaObject::invokeMethod(... "postEvent", Q_ARG(QEvent*, nullptr)) was UB/crash
+        // postEvent requires non-null receiver and non-null event; only one Q_ARG was provided.
         QTimer::singleShot(100, nullptr, [message = QString("检测到数据损坏，已自动恢复") ] {
             qDebug() << message;
         });

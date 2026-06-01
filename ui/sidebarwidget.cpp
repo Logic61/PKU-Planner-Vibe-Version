@@ -7,8 +7,6 @@
 #include <QTimer>
 #include <QMouseEvent>
 #include <QDebug>
-#include <QDir>
-#include <QCoreApplication>
 #include "../widgets/mascot/mascotwidget.h"
 #include "../services/mascotstateservice.h"
 
@@ -102,25 +100,27 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     btnConnect = new QPushButton("连接教学网");
     QString connectStyle = QString(R"(
         QPushButton {
-            background: transparent;
-            border: 1px dashed rgba(255,255,255,0.18);
+            background: #C62828;
+            border: none;
             border-radius: 12px;
             padding: 10px;
             color: white;
             font-weight: 600;
         }
         QPushButton:hover {
-            background: rgba(255,255,255,0.04);
+            background: #B71C1C;
         }
     )");
     btnConnect->setStyleSheet(connectStyle);
     btnConnect->setCursor(Qt::PointingHandCursor);
     layout->addWidget(btnConnect);
 
+    connect(btnConnect, &QPushButton::clicked, this, &SidebarWidget::connectTeachingPlatformRequested);
+
     layout->addStretch();
 
     QFrame *mascotContainer = new QFrame(this);
-    mascotContainer->setFixedSize(200, 160);
+    mascotContainer->setFixedHeight(160);
     mascotContainer->setStyleSheet("background:transparent;");
     QVBoxLayout *mascotLayout = new QVBoxLayout(mascotContainer);
     mascotLayout->setContentsMargins(0, 10, 0, 10);
@@ -135,9 +135,7 @@ SidebarWidget::SidebarWidget(QWidget *parent)
     mascotLabel->setMouseTracking(true);
 
     auto loadMascotImage = [&](MascotState state) {
-        // 1. 获取当前程序可执行文件所在的目录
-        QString appDirPath = QCoreApplication::applicationDirPath();
-        QString imagePath = QDir::cleanPath(appDirPath + "/image/%1.png").arg((int)state);
+        QString imagePath = QString(":/mascot/%1").arg((int)state);
         qDebug() << "[Sidebar] Loading mascot image:" << imagePath;
         QPixmap pix(imagePath);
 
@@ -172,7 +170,7 @@ SidebarWidget::SidebarWidget(QWidget *parent)
 
 layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
 
-    connect(btnDashboard, &QPushButton::clicked, [=](){
+    connect(btnDashboard, &QPushButton::clicked, [this](){
         btnDashboard->setChecked(true);
         btnTodo->setChecked(false);
         btnStats->setChecked(false);
@@ -180,7 +178,7 @@ layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
         emit pageChanged(0);
     });
 
-    connect(btnTodo, &QPushButton::clicked, [=](){
+    connect(btnTodo, &QPushButton::clicked, [this](){
         btnTodo->setChecked(true);
         btnDashboard->setChecked(false);
         btnStats->setChecked(false);
@@ -188,7 +186,7 @@ layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
         emit pageChanged(1);
     });
 
-    connect(btnStats, &QPushButton::clicked, [=](){
+    connect(btnStats, &QPushButton::clicked, [this](){
         btnStats->setChecked(true);
         btnDashboard->setChecked(false);
         btnTodo->setChecked(false);
@@ -196,7 +194,7 @@ layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
         emit pageChanged(2);
     });
 
-    connect(btnSettings, &QPushButton::clicked, [=](){
+    connect(btnSettings, &QPushButton::clicked, [this](){
         btnSettings->setChecked(true);
         btnDashboard->setChecked(false);
         btnTodo->setChecked(false);
@@ -204,7 +202,7 @@ layout->addWidget(mascotContainer, 0, Qt::AlignCenter);
         emit pageChanged(3);
     });
 
-    connect(this, &SidebarWidget::pageChanged, [=](int page){
+    connect(this, &SidebarWidget::pageChanged, [this](int page){
         btnDashboard->setChecked(page == 0);
         btnTodo->setChecked(page == 1);
         btnStats->setChecked(page == 2);

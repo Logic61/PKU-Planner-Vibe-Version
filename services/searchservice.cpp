@@ -58,7 +58,7 @@ QVector<SearchResult> SearchService::searchTasks(const QString& keyword)
             r.type = SearchResult::Task;
             r.title = t.title;
             r.subtitle = QString("课程: %1 | DDL: %2").arg(t.course).arg(t.deadline.toString("yyyy-MM-dd hh:mm"));
-            r.id = QString::number(i);
+            r.id = QString("%1::%2").arg(t.course).arg(t.title);
             r.icon = t.completed ? "✅" : "📝";
             results.append(r);
         }

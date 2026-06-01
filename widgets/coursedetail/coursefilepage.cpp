@@ -146,7 +146,7 @@ CourseFilePage::CourseFilePage(QWidget* parent)
     recentLayout->addWidget(fileList);
     root->addWidget(recentCard, 1);
 
-    emptyStateWidget = new EmptyStateWidget;
+    emptyStateWidget = new EmptyStateWidget(this);
     emptyStateWidget->setContent("📁", "暂无课程资料", "绑定文件夹或拖入文件开始使用");
     emptyStateWidget->hide();
     connect(emptyStateWidget, &EmptyStateWidget::buttonClicked, this, &CourseFilePage::bindFolder);

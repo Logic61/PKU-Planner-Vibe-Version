@@ -48,7 +48,7 @@ void PageAnimator::slideToPage(QStackedWidget *stack, QWidget *targetPage)
     group->addAnimation(slideOut);
     group->addAnimation(slideIn);
 
-    QObject::connect(group, &QParallelAnimationGroup::finished, stack, [=]() {
+    QObject::connect(group, &QParallelAnimationGroup::finished, stack, [oldPage, newPage, width, height, stack, slideOut, slideIn, group]() {
         oldPage->setVisible(false);
         oldPage->setGeometry(0, 0, width, height);
         stack->setCurrentWidget(newPage);

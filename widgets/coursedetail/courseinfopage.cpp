@@ -13,6 +13,8 @@
 #include <QStringList>
 #include <QSet>
 #include <QInputDialog>
+#include <QEvent>
+#include <QMouseEvent>
 #include <algorithm>
 
 #include "../../models/datamanager.h"
@@ -193,6 +195,9 @@ QWidget* CourseInfoPage::createTeacherCard()
 
     connect(contactLabel, &QLabel::linkActivated, this, &CourseInfoPage::editContact);
 
+    // linkActivated only fires on HTML links; install event filter for plain-text click
+    contactLabel->installEventFilter(this);
+
     return card;
 }
 
@@ -344,4 +349,13 @@ void CourseInfoPage::editContact()
         contactLabel->setText(text.trimmed().isEmpty() ? "未填写联系方式" : text);
         emit courseUpdated(currentCourse);
     }
+}
+
+bool CourseInfoPage::eventFilter(QObject* obj, QEvent* event)
+{
+    if (obj == contactLabel && event->type() == QEvent::MouseButtonPress) {
+        editContact();
+        return true;
+    }
+    return QWidget::eventFilter(obj, event);
 }

@@ -220,7 +220,9 @@ ConfirmDialog::ConfirmDialog(
             background: #EEEEEE;
         }
     )");
-    connect(cancelBtn, &QPushButton::clicked, this, &QDialog::reject);
+    connect(cancelBtn, &QPushButton::clicked, this, [this]() {
+        done(QMessageBox::Cancel);
+    });
 
     QPushButton *noBtn = new QPushButton(noText, container);
     noBtn->setCursor(Qt::PointingHandCursor);

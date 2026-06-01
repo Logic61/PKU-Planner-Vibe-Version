@@ -7,6 +7,7 @@
 #include "../models/course.h"
 #include "../models/task.h"
 #include <vector>
+#include <optional>
 
 class QGridLayout;
 class QLabel;
@@ -21,7 +22,8 @@ class EmptyStateWidget;
 
 enum class VisionModelType {
     Gemini,
-    Doubao
+    Doubao,
+    DeepSeek
 };
 
 class ScheduleVisionParser {
@@ -48,6 +50,17 @@ public:
 };
 
 class DoubaoParser : public ScheduleVisionParser {
+public:
+    void parseImage(
+        const QString& imagePath,
+        const QString& apiKey,
+        QNetworkAccessManager* networkManager,
+        std::function<void(const QString&)> onSuccess,
+        std::function<void(const QString&)> onError
+    ) override;
+};
+
+class DeepSeekParser : public ScheduleVisionParser {
 public:
     void parseImage(
         const QString& imagePath,
@@ -85,7 +98,7 @@ private:
 
     void renderCourses();
 
-    int getNearestDDL(const QString& courseName);
+    std::optional<int> getNearestDDL(const QString& courseName);
 
     QGridLayout *grid;
     QWidget *gridContainer;
@@ -121,9 +134,23 @@ private:
     QString getModelApiKey(VisionModelType model);
     void callVisionAPI(VisionModelType model, const QString& apiKey, const QString& imagePath);
     void onVisionReplyFinished(QNetworkReply* reply);
+
+    // AI Suggestion
+    void askAISuggestion();
+    void viewAISuggestion();
+    VisionModelType selectAIModel();
+    QString getAIModelApiKey(VisionModelType model);
+    void callAISuggestion(VisionModelType model, const QString& apiKey);
+    void onAISuggestionFinished(QNetworkReply* reply);
+    QString buildSuggestionPrompt() const;
+    QString promptForApiKey(const QString& title, const QString& prompt);
+
     QNetworkAccessManager* m_networkManager = nullptr;
     QProgressDialog* m_loadingDialog = nullptr;
     QString m_lastResponse;
+    QPushButton* m_aiSuggestBtn = nullptr;
+    QPushButton* m_viewSuggestionBtn = nullptr;
+    QString m_lastAISuggestion;
 };
 
 #endif

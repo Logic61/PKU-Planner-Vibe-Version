@@ -153,7 +153,7 @@ WeeklySummaryDialog::WeeklySummaryDialog(QWidget* parent)
         barLayout->setSpacing(0);
 
         int total = summary.busiestCourseTasks;
-        int completed = qMin(total, 3);
+        int completed = summary.busiestCourseCompletedTasks;
         int pending = total - completed;
         if (completed > 0) {
             QFrame* completedBar = new QFrame;

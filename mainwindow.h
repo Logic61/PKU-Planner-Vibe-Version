@@ -40,7 +40,7 @@ private slots:
     void handleEditCourseRequested(Course course);
     void showMascotPopup();
     void onSearchCourseRequested(const QString& courseName);
-    void onSearchTaskRequested(int taskIndex);
+    void onSearchTaskRequested(const QString& courseAndTitle);
     void focusSearch();
 
 private:

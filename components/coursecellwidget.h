@@ -3,6 +3,7 @@
 
 #include <QFrame>
 #include "../models/course.h"
+#include <optional>
 
 class QLabel;
 class QMouseEvent;
@@ -16,7 +17,7 @@ class CourseCellWidget : public QFrame
 public:
     explicit CourseCellWidget(int row = 0, int col = 0, QWidget *parent = nullptr);
 
-    void setCourse(QString name, QString location, QString teacher, int index = -1, int daysLeft = -999, QString scheduleSummary = QString());
+    void setCourse(QString name, QString location, QString teacher, int index = -1, std::optional<int> daysLeft = std::nullopt, QString scheduleSummary = QString());
 
 signals:
     void createCourseRequested(int row, int col);

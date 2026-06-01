@@ -1,5 +1,6 @@
 #include "dashboardpage.h"
 #include <functional>
+#include <algorithm>
 #include "../ui/theme.h"
 #include "../ui/sidebarwidget.h"
 #include "../components/coursecellwidget.h"
@@ -41,11 +42,7 @@
 #include <QSequentialAnimationGroup>
 #include <QParallelAnimationGroup>
 #include <QGraphicsDropShadowEffect>
-#include <QInputDialog>
 #include <QFileDialog>
-#include <QJsonDocument>
-#include <QJsonObject>
-#include <QJsonArray>
 #include <QMessageBox>
 #include <QHeaderView>
 #include <QTableWidget>
@@ -302,17 +299,15 @@ QWidget* DashboardPage::createTopBar()
     layout->addWidget(nextBtn, 0);
     layout->addWidget(todayBtn, 0);
 
-    connect(prevBtn,&QPushButton::clicked,this,[=](){
+    connect(prevBtn,&QPushButton::clicked,this,[this](){
         currentWeek--;
         updateWeekInfo(false);
     });
-
-    connect(nextBtn,&QPushButton::clicked,this,[=](){
+    connect(nextBtn,&QPushButton::clicked,this,[this](){
         currentWeek++;
         updateWeekInfo(false);
     });
-
-    connect(todayBtn,&QPushButton::clicked,this,[=](){
+    connect(todayBtn,&QPushButton::clicked,this,[this](){
         currentWeek = realWeek;
         updateWeekInfo(false);
     });
@@ -408,7 +403,7 @@ QWidget* DashboardPage::createBottomStats()
             timeLabel = num;
             timeLabel->setStyleSheet(QString("font-size:18px; font-weight:700; color:%1; background:transparent;").arg(Theme::PRIMARY));
             QTimer *timer = new QTimer(this);
-            connect(timer,&QTimer::timeout,this,[=](){
+            connect(timer,&QTimer::timeout,this,[this](){
                 timeLabel->setText(QDateTime::currentDateTime().toString("yyyy-MM-dd\nhh:mm:ss"));
                 updateTodayCourses();
             });
@@ -430,10 +425,15 @@ void DashboardPage::updateBottomStats()
     const QList<Task> tasks = DataManager::instance().tasks();
     const QDate today = QDate::currentDate();
 
-    int currentYear = 0;
     const int displayWeek = currentWeek;
     const bool isSingle = realWeek % 2 == 1;
     const int displayWeekday = today.dayOfWeek();
+
+    // Compute the year for the displayed week (for 本周DDL comparison)
+    QDate semesterStart = ConfigService::instance().getSemesterStart();
+    int displayYear = semesterStart.isValid()
+        ? semesterStart.addDays((displayWeek - 1) * 7).year()
+        : today.year();
 
     int todayCourseCount = 0;
     for (const Course &course : courses) {
@@ -464,7 +464,7 @@ void DashboardPage::updateBottomStats()
 
         int deadlineYear = 0;
         const int deadlineWeek = deadlineDate.weekNumber(&deadlineYear);
-        if (displayWeek == deadlineWeek && currentYear == deadlineYear) {
+        if (displayWeek == deadlineWeek && displayYear == deadlineYear) {
             ++weekDdlCount;
         }
     }
@@ -854,20 +854,20 @@ for(int row=0; row<12; row++)
     }
 }
 
-int DashboardPage::getNearestDDL(const QString& courseName)
+std::optional<int> DashboardPage::getNearestDDL(const QString& courseName)
 {
-    int minDays = 9999;
+    std::optional<int> result;
     const auto tasks = DataManager::instance().tasks();
 
     for (const Task &task : tasks) {
         if (task.course == courseName && !task.completed) {
             const int daysLeft = QDateTime::currentDateTime().daysTo(task.deadline);
-            if (daysLeft < minDays) {
-                minDays = daysLeft;
+            if (!result.has_value() || daysLeft < result.value()) {
+                result = daysLeft;
             }
         }
     }
-    return minDays == 9999 ? -999 : minDays;
+    return result;
 }
 
 void DashboardPage::renderCourses()
@@ -923,7 +923,7 @@ void DashboardPage::renderCourses()
         if (c.weekType == 1 && currentWeek % 2 == 0) continue;
         if (c.weekType == 2 && currentWeek % 2 == 1) continue;
 
-        const int daysLeft = getNearestDDL(c.name);
+        auto daysLeft = getNearestDDL(c.name);
         CourseCellWidget *cell = new CourseCellWidget(c.startPeriod, c.day);
         cell->setCourse(c.name, c.location, c.teacher, i, daysLeft);
 
@@ -1254,9 +1254,59 @@ QWidget* DashboardPage::createSuggestionCard()
     layout->setContentsMargins(16, 14, 16, 14);
     layout->setSpacing(8);
 
+    // Title row with AI button
+    QHBoxLayout *titleRow = new QHBoxLayout;
+    titleRow->setSpacing(4);
     QLabel *title = new QLabel("今日建议");
     title->setStyleSheet(QString("font-weight:700; font-size:14px; color:%1;").arg(Theme::TEXT_PRIMARY));
-    layout->addWidget(title);
+    titleRow->addWidget(title);
+    titleRow->addStretch();
+
+    m_aiSuggestBtn = new QPushButton("让大模型给出建议");
+    m_aiSuggestBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: %1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 4px 10px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %2;
+        }
+        QPushButton:pressed {
+            background: %3;
+        }
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK).arg("#6B1523"));
+    m_aiSuggestBtn->setCursor(Qt::PointingHandCursor);
+    titleRow->addWidget(m_aiSuggestBtn);
+    connect(m_aiSuggestBtn, &QPushButton::clicked, this, &DashboardPage::askAISuggestion);
+
+    layout->addLayout(titleRow);
+
+    // "查看AI建议" button — hidden until we have a suggestion
+    m_viewSuggestionBtn = new QPushButton("查看AI建议");
+    m_viewSuggestionBtn->setVisible(false);
+    m_viewSuggestionBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: #F0F7FF;
+            color: %1;
+            border: 1px solid %1;
+            border-radius: 8px;
+            padding: 8px 14px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %1;
+            color: white;
+        }
+    )").arg(Theme::PRIMARY));
+    m_viewSuggestionBtn->setCursor(Qt::PointingHandCursor);
+    connect(m_viewSuggestionBtn, &QPushButton::clicked, this, &DashboardPage::viewAISuggestion);
+    layout->addWidget(m_viewSuggestionBtn);
 
     const auto tasks = DataManager::instance().tasks();
     const auto courses = DataManager::instance().courses();
@@ -1600,15 +1650,40 @@ VisionModelType DashboardPage::selectVisionModel()
 
 QString DashboardPage::getModelApiKey(VisionModelType model)
 {
-    QString title = (model == VisionModelType::Gemini) ? "Gemini API Key" : "豆包 API Key";
-    QString prompt = (model == VisionModelType::Gemini) ? "请输入 Gemini API Key:" : "请输入豆包 API Key(提示:api需开通mini模型):";
+    ConfigService& cfg = ConfigService::instance();
+    QString title, prompt, savedKey;
 
-    bool ok;
-    QString apiKey = QInputDialog::getText(this, title, prompt, QLineEdit::Password, "", &ok);
+    if (model == VisionModelType::Gemini) {
+        title = "Gemini API Key";
+        prompt = "请输入 Gemini API Key";
+        savedKey = cfg.geminiApiKey();
+    } else if (model == VisionModelType::Doubao) {
+        title = "豆包 API Key";
+        prompt = "请输入豆包 API Key（提示：需开通 mini 模型）";
+        savedKey = cfg.doubaoApiKey();
+    } else {
+        title = "DeepSeek API Key";
+        prompt = "请输入 DeepSeek API Key";
+        savedKey = cfg.deepseekApiKey();
+    }
 
-    if (!ok || apiKey.isEmpty()) {
+    if (!savedKey.isEmpty()) {
+        return savedKey;
+    }
+
+    QString apiKey = promptForApiKey(title, prompt);
+    if (apiKey.isEmpty()) {
         return QString();
     }
+
+    if (model == VisionModelType::Gemini) {
+        cfg.setGeminiApiKey(apiKey);
+    } else if (model == VisionModelType::Doubao) {
+        cfg.setDoubaoApiKey(apiKey);
+    } else {
+        cfg.setDeepseekApiKey(apiKey);
+    }
+
     return apiKey;
 }
 
@@ -1749,7 +1824,8 @@ void GeminiParser::parseImage(
     QByteArray imageData = file.readAll();
     file.close();
 
-    QUrl url(QString("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=%1").arg(apiKey));
+    QUrl url(QString("https://generativelanguage.googleapis.com/v1beta/models/%1:generateContent?key=%2")
+        .arg(ConfigService::instance().geminiModel()).arg(apiKey));
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -1839,7 +1915,7 @@ void DoubaoParser::parseImage(
     QByteArray imageData = file.readAll();
     file.close();
 
-    QUrl url("https://ark.cn-beijing.volces.com/api/v3/chat/completions");
+    QUrl url(ConfigService::instance().doubaoApiUrl());
 
     QNetworkRequest request(url);
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
@@ -1871,7 +1947,7 @@ void DoubaoParser::parseImage(
     messages.append(message);
 
     QJsonObject root;
-    root["model"] = "doubao-seed-2-0-mini-260428";
+    root["model"] = ConfigService::instance().doubaoModel();
     root["messages"] = messages;
 
     QByteArray jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
@@ -1911,6 +1987,94 @@ QString jsonText = firstChoice["message"].toObject()["content"].toString();
     });
 }
 
+void DeepSeekParser::parseImage(
+    const QString& imagePath,
+    const QString& apiKey,
+    QNetworkAccessManager* networkManager,
+    std::function<void(const QString&)> onSuccess,
+    std::function<void(const QString&)> onError)
+{
+    QFile file(imagePath);
+    if (!file.open(QIODevice::ReadOnly)) {
+        onError("无法读取图片文件");
+        return;
+    }
+
+    QByteArray imageData = file.readAll();
+    file.close();
+
+    QUrl url(ConfigService::instance().deepseekApiUrl());
+
+    QNetworkRequest request(url);
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+
+    QByteArray base64Image = imageData.toBase64();
+    QString base64Str = QString::fromLatin1(base64Image);
+
+    QJsonObject imageUrl;
+    imageUrl["url"] = QString("data:image/png;base64,%1").arg(base64Str);
+
+    QJsonObject imageContent;
+    imageContent["type"] = "image_url";
+    imageContent["image_url"] = imageUrl;
+
+    QJsonObject textContent;
+    textContent["type"] = "text";
+    textContent["text"] = getVisionPrompt();
+
+    QJsonArray contentArray;
+    contentArray.append(imageContent);
+    contentArray.append(textContent);
+
+    QJsonObject message;
+    message["role"] = "user";
+    message["content"] = contentArray;
+
+    QJsonArray messages;
+    messages.append(message);
+
+    QJsonObject root;
+    root["model"] = ConfigService::instance().deepseekModel();
+    root["messages"] = messages;
+
+    QByteArray jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
+
+    QNetworkReply* reply = networkManager->post(request, jsonData);
+    QObject::connect(reply, &QNetworkReply::finished, [reply, onSuccess, onError]() {
+        if (reply->error() != QNetworkReply::NoError) {
+            onError(QString("API请求失败: %1").arg(reply->errorString()));
+            reply->deleteLater();
+            return;
+        }
+
+        QByteArray responseData = reply->readAll();
+        reply->deleteLater();
+
+        QJsonDocument doc = QJsonDocument::fromJson(responseData);
+        if (doc.isNull()) {
+            onError("无法解析API返回的数据");
+            return;
+        }
+
+        QJsonObject root = doc.object();
+        if (!root.contains("choices") || root["choices"].toArray().isEmpty()) {
+            onError("API返回格式不正确");
+            return;
+        }
+
+        QJsonArray choices = root["choices"].toArray();
+        QJsonObject firstChoice = choices[0].toObject();
+        if (!firstChoice.contains("message") || !firstChoice["message"].toObject().contains("content")) {
+            onError("API返回格式缺少内容");
+            return;
+        }
+
+        QString jsonText = firstChoice["message"].toObject()["content"].toString();
+        onSuccess(jsonText);
+    });
+}
+
 void DashboardPage::callVisionAPI(VisionModelType model, const QString& apiKey, const QString& imagePath)
 {
     if (!m_networkManager) {
@@ -1920,8 +2084,10 @@ void DashboardPage::callVisionAPI(VisionModelType model, const QString& apiKey, 
     ScheduleVisionParser* parser = nullptr;
     if (model == VisionModelType::Gemini) {
         parser = new GeminiParser();
-    } else {
+    } else if (model == VisionModelType::Doubao) {
         parser = new DoubaoParser();
+    } else {
+        parser = new DeepSeekParser();
     }
 
     parser->parseImage(imagePath, apiKey, m_networkManager,
@@ -2006,6 +2172,26 @@ void DashboardPage::onVisionReplyFinished(QNetworkReply* reply)
         }
     }
 
+    // 合并相邻同名课程
+    std::sort(importedCourses.begin(), importedCourses.end(), [](const Course &a, const Course &b) {
+        if (a.day != b.day) return a.day < b.day;
+        return a.startPeriod < b.startPeriod;
+    });
+    QList<Course> merged;
+    for (const Course &c : importedCourses) {
+        if (!merged.isEmpty()) {
+            Course &last = merged.last();
+            if (last.day == c.day && last.name == c.name && last.endPeriod + 1 >= c.startPeriod) {
+                last.endPeriod = qMax(last.endPeriod, c.endPeriod);
+                if (c.teacher.length() > last.teacher.length()) last.teacher = c.teacher;
+                if (c.location.length() > last.location.length()) last.location = c.location;
+                continue;
+            }
+        }
+        merged.append(c);
+    }
+    importedCourses = merged;
+
     if (importedCourses.isEmpty()) {
         QMessageBox::warning(this, "导入失败", "未找到有效的课程数据");
         return;
@@ -2038,4 +2224,464 @@ void DashboardPage::importFromTeachingPlatform()
 {
     // Emit the request signal so MainWindow can handle the import via TeachingPlatformService
     emit importFromTeachingPlatformRequested();
+}
+
+// ===== AI Suggestion Methods =====
+
+QString DashboardPage::buildSuggestionPrompt() const
+{
+    const auto courses = DataManager::instance().courses();
+    const auto tasks = DataManager::instance().tasks();
+    const QDate today = QDate::currentDate();
+    const int todayWeekday = today.dayOfWeek();
+    const QDateTime now = QDateTime::currentDateTime();
+
+    QJsonObject coursesObj;
+    QJsonArray coursesArr;
+    for (const Course& c : courses) {
+        QJsonObject co;
+        co["name"] = c.name;
+        co["teacher"] = c.teacher;
+        co["location"] = c.location;
+        co["day"] = c.day;
+        co["startPeriod"] = c.startPeriod;
+        co["endPeriod"] = c.endPeriod;
+        co["weekType"] = c.weekType;
+        co["examTime"] = c.examTime;
+        coursesArr.append(co);
+    }
+    coursesObj["courses"] = coursesArr;
+
+    QJsonObject tasksObj;
+    QJsonArray tasksArr;
+    for (const Task& t : tasks) {
+        QJsonObject to;
+        to["course"] = t.course;
+        to["title"] = t.title;
+        to["deadline"] = t.deadline.toString("yyyy-MM-dd HH:mm");
+        to["priority"] = t.priority;
+        to["completed"] = t.completed;
+        tasksArr.append(to);
+    }
+    tasksObj["tasks"] = tasksArr;
+
+    QJsonObject contextObj;
+    contextObj["courses"] = coursesObj;
+    contextObj["tasks"] = tasksObj;
+    contextObj["todayDate"] = today.toString("yyyy-MM-dd");
+    contextObj["todayWeekday"] = todayWeekday;
+    contextObj["currentWeek"] = currentWeek;
+
+    QString dataJson = QJsonDocument(contextObj).toJson(QJsonDocument::Compact);
+
+    return QString::fromUtf8(
+        "你是一个大学生学业规划助手。请根据以下课程表和任务(DDL)信息，给该学生提供简洁、实用的今日学习建议。\n\n"
+        "学生数据（JSON格式）：\n"
+    ) + dataJson + QString::fromUtf8(
+        "\n\n"
+        "请遵循以下规则：\n"
+        "1. 分析今日课程安排，给出课前准备或课后复习建议。\n"
+        "2. 检查DDL情况：有逾期的要提醒优先处理，有即将到期的要给出时间规划建议。\n"
+        "3. 如果本周有考试临近的课程，提醒复习。\n"
+        "4. 如果今天没有课程，建议安排自习或休息。\n"
+        "5. 语气友好、简洁，像一个贴心的学长学姐。\n"
+        "6. 输出3-5条具体建议，每条建议用简短的一句话。\n"
+        "7. 不要输出JSON或代码，直接输出中文文本建议。\n"
+        "8. 如果没有任何课程和任务，告诉学生先添加课程和任务。\n"
+        "9. 重要：请使用纯文本输出，不要使用任何Markdown语法（如**加粗**、#标题、-列表符号等），直接输出中文句子。"
+    );
+}
+
+void DashboardPage::askAISuggestion()
+{
+    const auto courses = DataManager::instance().courses();
+    const auto tasks = DataManager::instance().tasks();
+
+    if (courses.isEmpty() && tasks.isEmpty()) {
+        QMessageBox::information(this, "提示", "请先添加课程和任务，大模型才能给出建议哦！");
+        return;
+    }
+
+    VisionModelType model = selectAIModel();
+    QString apiKey = getAIModelApiKey(model);
+    if (apiKey.isEmpty()) {
+        return;
+    }
+
+    callAISuggestion(model, apiKey);
+}
+
+VisionModelType DashboardPage::selectAIModel()
+{
+    QMessageBox msgBox(this);
+    msgBox.setWindowTitle("选择大模型");
+    msgBox.setText("请选择用于智能建议的大模型：");
+    msgBox.setIcon(QMessageBox::Question);
+    msgBox.setStyleSheet(QString(
+        "QMessageBox { background: white; border-radius: %1px; }"
+        "QLabel { font-size: 14px; color: %2; padding: 8px; }"
+        "QPushButton { "
+        "  background: white; color: %2; border: 1px solid %3; "
+        "  border-radius: %4px; padding: 10px 24px; font-size: 14px; font-weight: 500; min-width: 100px; "
+        "} "
+        "QPushButton:hover { background: %5; color: white; border-color: %3; }"
+    ).arg(Theme::CARD_RADIUS).arg(Theme::TEXT_PRIMARY).arg(Theme::PRIMARY)
+      .arg(Theme::BUTTON_RADIUS).arg(Theme::PRIMARY_DARK));
+
+    QPushButton *deepseekBtn = msgBox.addButton("DeepSeek", QMessageBox::ActionRole);
+    QPushButton *doubaoBtn = msgBox.addButton("豆包", QMessageBox::ActionRole);
+    QPushButton *geminiBtn = msgBox.addButton("Gemini", QMessageBox::ActionRole);
+    QPushButton *cancelBtn = msgBox.addButton("取消", QMessageBox::RejectRole);
+
+    deepseekBtn->setCursor(Qt::PointingHandCursor);
+    doubaoBtn->setCursor(Qt::PointingHandCursor);
+    geminiBtn->setCursor(Qt::PointingHandCursor);
+    cancelBtn->setCursor(Qt::PointingHandCursor);
+
+    msgBox.exec();
+
+    if (msgBox.clickedButton() == deepseekBtn) {
+        return VisionModelType::DeepSeek;
+    } else if (msgBox.clickedButton() == doubaoBtn) {
+        return VisionModelType::Doubao;
+    } else if (msgBox.clickedButton() == geminiBtn) {
+        return VisionModelType::Gemini;
+    }
+    return VisionModelType::DeepSeek;
+}
+
+QString DashboardPage::getAIModelApiKey(VisionModelType model)
+{
+    ConfigService& cfg = ConfigService::instance();
+    QString title, prompt, savedKey;
+
+    if (model == VisionModelType::Gemini) {
+        title = "Gemini API Key";
+        prompt = "请输入 Gemini API Key";
+        savedKey = cfg.geminiApiKey();
+    } else if (model == VisionModelType::Doubao) {
+        title = "豆包 API Key";
+        prompt = "请输入豆包 API Key";
+        savedKey = cfg.doubaoApiKey();
+    } else {
+        title = "DeepSeek API Key";
+        prompt = "请输入 DeepSeek API Key";
+        savedKey = cfg.deepseekApiKey();
+    }
+
+    if (!savedKey.isEmpty()) {
+        return savedKey;
+    }
+
+    QString apiKey = promptForApiKey(title, prompt);
+    if (apiKey.isEmpty()) {
+        return QString();
+    }
+
+    if (model == VisionModelType::Gemini) {
+        cfg.setGeminiApiKey(apiKey);
+    } else if (model == VisionModelType::Doubao) {
+        cfg.setDoubaoApiKey(apiKey);
+    } else {
+        cfg.setDeepseekApiKey(apiKey);
+    }
+
+    return apiKey;
+}
+
+void DashboardPage::callAISuggestion(VisionModelType model, const QString& apiKey)
+{
+    if (!m_networkManager) {
+        m_networkManager = new QNetworkAccessManager(this);
+    }
+
+    QString prompt = buildSuggestionPrompt();
+    QString url;
+    QString modelName;
+
+    if (model == VisionModelType::Gemini) {
+        url = QString("https://generativelanguage.googleapis.com/v1beta/models/%1:generateContent?key=%2")
+                .arg(ConfigService::instance().geminiModel()).arg(apiKey);
+    } else if (model == VisionModelType::Doubao) {
+        url = ConfigService::instance().doubaoApiUrl();
+        modelName = ConfigService::instance().doubaoModel();
+    } else {
+        url = ConfigService::instance().deepseekApiUrl();
+        modelName = ConfigService::instance().deepseekModel();
+    }
+
+    QNetworkRequest request{QUrl(url)};
+    request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
+
+    if (model != VisionModelType::Gemini) {
+        request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    }
+
+    QByteArray jsonData;
+    if (model == VisionModelType::Gemini) {
+        QJsonObject textPart;
+        textPart["text"] = prompt;
+        QJsonArray parts;
+        parts.append(textPart);
+        QJsonObject content;
+        content["parts"] = parts;
+        QJsonArray contents;
+        contents.append(content);
+        QJsonObject root;
+        root["contents"] = contents;
+        jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    } else {
+        QJsonObject message;
+        message["role"] = "user";
+        message["content"] = prompt;
+        QJsonArray messages;
+        messages.append(message);
+        QJsonObject root;
+        root["model"] = modelName;
+        root["messages"] = messages;
+        jsonData = QJsonDocument(root).toJson(QJsonDocument::Compact);
+    }
+
+    m_aiSuggestBtn->setEnabled(false);
+    m_aiSuggestBtn->setText("思考中...");
+
+    QNetworkReply* reply = m_networkManager->post(request, jsonData);
+    QObject::connect(reply, &QNetworkReply::finished, this, [this, reply, model]() {
+        onAISuggestionFinished(reply);
+    });
+}
+
+void DashboardPage::onAISuggestionFinished(QNetworkReply* reply)
+{
+    m_aiSuggestBtn->setEnabled(true);
+    m_aiSuggestBtn->setText("让大模型给出建议");
+
+    if (reply->error() != QNetworkReply::NoError) {
+        QString errMsg = reply->errorString();
+        reply->deleteLater();
+        QMessageBox::warning(this, "请求失败", QString("API请求失败: %1").arg(errMsg));
+        return;
+    }
+
+    QByteArray responseData = reply->readAll();
+    reply->deleteLater();
+
+    QJsonDocument doc = QJsonDocument::fromJson(responseData);
+    if (doc.isNull()) {
+        QMessageBox::warning(this, "解析失败", "无法解析API返回的数据");
+        return;
+    }
+
+    QString text;
+    QJsonObject root = doc.object();
+
+    // Gemini format: candidates[0].content.parts[0].text
+    if (root.contains("candidates")) {
+        QJsonArray candidates = root["candidates"].toArray();
+        if (!candidates.isEmpty()) {
+            QJsonObject content = candidates[0].toObject()["content"].toObject();
+            QJsonArray parts = content["parts"].toArray();
+            if (!parts.isEmpty()) {
+                text = parts[0].toObject()["text"].toString();
+            }
+        }
+    }
+    // OpenAI format: choices[0].message.content
+    else if (root.contains("choices")) {
+        QJsonArray choices = root["choices"].toArray();
+        if (!choices.isEmpty()) {
+            text = choices[0].toObject()["message"].toObject()["content"].toString();
+        }
+    }
+
+    // Error response from API
+    if (text.isEmpty() && root.contains("error")) {
+        QJsonObject err = root["error"].toObject();
+        QString errMsg = err.contains("message") ? err["message"].toString() : QString(QJsonDocument(err).toJson(QJsonDocument::Compact));
+        QMessageBox::warning(this, "API错误", QString("大模型返回错误:\n%1").arg(errMsg));
+        return;
+    }
+
+    if (text.isEmpty()) {
+        QMessageBox::warning(this, "无内容", "大模型未返回有效建议");
+        return;
+    }
+
+    // Strip markdown code fences if present
+    text = text.trimmed();
+    if (text.startsWith("```")) {
+        int firstNewline = text.indexOf('\n');
+        int lastTripleBacktick = text.lastIndexOf("```");
+        if (firstNewline > 0 && lastTripleBacktick > firstNewline) {
+            text = text.mid(firstNewline + 1, lastTripleBacktick - firstNewline - 1);
+        }
+    }
+    text = text.trimmed();
+
+    // Display the suggestion — save to member and show view button
+    m_lastAISuggestion = text;
+    m_viewSuggestionBtn->setVisible(true);
+}
+
+void DashboardPage::viewAISuggestion()
+{
+    if (m_lastAISuggestion.isEmpty()) {
+        return;
+    }
+
+    QDialog dlg(this);
+    dlg.setWindowTitle("AI 智能建议");
+    dlg.setWindowFlags(dlg.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    dlg.setMinimumSize(420, 300);
+    dlg.setStyleSheet("QDialog { background: white; border-radius: " + QString::number(Theme::CARD_RADIUS) + "px; }");
+
+    QVBoxLayout *layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(20, 20, 20, 20);
+    layout->setSpacing(12);
+
+    QLabel *title = new QLabel("AI 建议", &dlg);
+    title->setStyleSheet(QString("font-weight:700; font-size:16px; color:%1; background:transparent;").arg(Theme::TEXT_PRIMARY));
+    layout->addWidget(title);
+
+    QFrame *divider = new QFrame(&dlg);
+    divider->setFrameShape(QFrame::HLine);
+    divider->setStyleSheet(QString("background:%1;").arg(Theme::BORDER));
+    layout->addWidget(divider);
+
+    QScrollArea *scroll = new QScrollArea(&dlg);
+    scroll->setWidgetResizable(true);
+    scroll->setFrameShape(QFrame::NoFrame);
+    scroll->setStyleSheet("background:transparent;");
+
+    QWidget *scrollContent = new QWidget(&dlg);
+    QVBoxLayout *scrollLayout = new QVBoxLayout(scrollContent);
+    scrollLayout->setContentsMargins(0, 0, 0, 0);
+
+    QLabel *content = new QLabel(m_lastAISuggestion, scrollContent);
+    content->setWordWrap(true);
+    content->setStyleSheet(QString("color:%1; font-size:13px; line-height:1.6; background:transparent; padding:8px;").arg(Theme::TEXT_PRIMARY));
+    scrollLayout->addWidget(content);
+
+    scroll->setWidget(scrollContent);
+    layout->addWidget(scroll, 1);
+
+    QPushButton *closeBtn = new QPushButton("我知道了", &dlg);
+    closeBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: %1;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 24px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %2;
+        }
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+    closeBtn->setCursor(Qt::PointingHandCursor);
+    connect(closeBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    QHBoxLayout *btnRow = new QHBoxLayout;
+    btnRow->addStretch();
+    btnRow->addWidget(closeBtn);
+    btnRow->addStretch();
+    layout->addLayout(btnRow);
+
+    dlg.exec();
+}
+
+QString DashboardPage::promptForApiKey(const QString& title, const QString& prompt)
+{
+    QDialog dlg(this);
+    dlg.setWindowTitle(title);
+    dlg.setWindowFlags(dlg.windowFlags() & ~Qt::WindowContextHelpButtonHint);
+    dlg.setMinimumWidth(380);
+    dlg.setStyleSheet("QDialog { background: white; }");
+
+    QVBoxLayout *layout = new QVBoxLayout(&dlg);
+    layout->setContentsMargins(24, 24, 24, 24);
+    layout->setSpacing(16);
+
+    QLabel *icon = new QLabel("🔑", &dlg);
+    icon->setStyleSheet("font-size:36px;");
+    icon->setAlignment(Qt::AlignCenter);
+    layout->addWidget(icon);
+
+    QLabel *desc = new QLabel(prompt, &dlg);
+    desc->setWordWrap(true);
+    desc->setStyleSheet(QString("color:%1; font-size:14px; background:transparent;").arg(Theme::TEXT_PRIMARY));
+    desc->setAlignment(Qt::AlignCenter);
+    layout->addWidget(desc);
+
+    QLineEdit *input = new QLineEdit(&dlg);
+    input->setEchoMode(QLineEdit::Password);
+    input->setPlaceholderText("sk-...");
+    input->setStyleSheet(QString(R"(
+        QLineEdit {
+            background: #F5F5F5;
+            border: 2px solid %1;
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 14px;
+            color: %2;
+        }
+        QLineEdit:focus {
+            border: 2px solid %3;
+            background: white;
+        }
+    )").arg(Theme::BORDER).arg(Theme::TEXT_PRIMARY).arg(Theme::PRIMARY));
+    layout->addWidget(input);
+
+    QHBoxLayout *btnRow = new QHBoxLayout;
+    btnRow->setSpacing(10);
+
+    QPushButton *cancelBtn = new QPushButton("取消", &dlg);
+    cancelBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: white;
+            color: %1;
+            border: 1px solid %2;
+            border-radius: 10px;
+            padding: 9px 22px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        QPushButton:hover {
+            background: #F5F5F5;
+        }
+    )").arg(Theme::TEXT_SECONDARY).arg(Theme::BORDER));
+    cancelBtn->setCursor(Qt::PointingHandCursor);
+    cancelBtn->setMinimumHeight(38);
+
+    QPushButton *okBtn = new QPushButton("确认", &dlg);
+    okBtn->setStyleSheet(QString(R"(
+        QPushButton {
+            background: %1;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 9px 22px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+        QPushButton:hover {
+            background: %2;
+        }
+    )").arg(Theme::PRIMARY).arg(Theme::PRIMARY_DARK));
+    okBtn->setCursor(Qt::PointingHandCursor);
+    okBtn->setMinimumHeight(38);
+
+    connect(cancelBtn, &QPushButton::clicked, &dlg, &QDialog::reject);
+    connect(okBtn, &QPushButton::clicked, &dlg, &QDialog::accept);
+
+    btnRow->addWidget(cancelBtn);
+    btnRow->addWidget(okBtn);
+    layout->addLayout(btnRow);
+
+    if (dlg.exec() == QDialog::Accepted) {
+        return input->text().trimmed();
+    }
+    return QString();
 }

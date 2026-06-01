@@ -19,7 +19,7 @@ public:
 
  signals:
     void searchCourseRequested(const QString& courseName);
-    void searchTaskRequested(int taskIndex);
+    void searchTaskRequested(const QString& courseAndTitle);
     void fileSelected(const QString& filePath);
 
 public:
@@ -29,7 +29,7 @@ private slots:
     void onSearchTextChanged(const QString& text);
     void onSearchReturned();
     void onCourseSelected(const QString& courseName);
-    void onTaskSelected(int taskIndex);
+    void onTaskSelected(const QString& courseAndTitle);
     void onFileSelected(const QString& filePath);
     void doSearch();
 

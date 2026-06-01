@@ -26,6 +26,9 @@ signals:
 private slots:
     void editContact();
 
+protected:
+    bool eventFilter(QObject* obj, QEvent* event) override;
+
 private:
     Course currentCourse;
 

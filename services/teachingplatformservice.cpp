@@ -642,6 +642,9 @@ QString normalizedTaskKey(const QString &course, const QString &title)
 
 QList<QJsonObject> filterNewTasksByCourseAndTitle(const QList<QJsonObject> &tasks)
 {
+    // Use a static set to avoid re-importing tasks with the same course+title within a session.
+    // NOTE: This means if a platform assignment is replaced (same name, new deadline),
+    // the new version will not be imported within the same session.
     static QSet<QString> importedTaskKeys;
 
     QList<QJsonObject> result;
@@ -674,11 +677,13 @@ bool looksLikeLoginPage(const QString &html)
         lower.contains("type='password'") ||
         lower.contains("name=\"password\"") ||
         lower.contains("name='password'");
+    // Require specific login-related paths/urls, NOT just the word "login" anywhere
+    // (e.g. "Forgot your login?" in a footer would cause false positive)
     bool hasLogin =
         lower.contains("webapps/login") ||
         lower.contains("oauthlogin.do") ||
         lower.contains("iaaa.pku.edu.cn") ||
-        lower.contains("login");
+        lower.contains("action=\"") && lower.contains("login");
     return hasPassword && hasLogin;
 }
 

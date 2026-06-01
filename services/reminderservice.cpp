@@ -2,6 +2,7 @@
 #include "../models/datamanager.h"
 #include "../models/task.h"
 #include <QDebug>
+#include <QSet>
 
 ReminderService::ReminderService(QObject *parent)
     : QObject(parent)
@@ -37,16 +38,23 @@ void ReminderService::checkUpcomingTasks()
     const QList<Task> &tasks = DataManager::instance().tasks();
     QDateTime now = QDateTime::currentDateTime();
 
+    // Clear notifications for tasks that are no longer in the reminder window
+    // or have been completed/removed
+    QSet<QString> activeKeys;
     for (const Task &task : tasks) {
-        if (task.completed) continue;
-        if (!task.deadline.isValid()) continue;
-
+        if (task.completed || !task.deadline.isValid()) continue;
         qint64 hoursUntilDeadline = now.secsTo(task.deadline) / 3600;
-
         if (hoursUntilDeadline > 0 && hoursUntilDeadline <= 24) {
-            qDebug() << "[ReminderService] Upcoming deadline:" << task.course << task.title
-                     << "due in" << hoursUntilDeadline << "hours";
-            emit reminderTriggered(task.course, task.title, task.deadline);
+            QString key = QString("%1::%2").arg(task.course).arg(task.title);
+            activeKeys.insert(key);
+            if (!m_notifiedTasks.contains(key)) {
+                m_notifiedTasks.insert(key);
+                qDebug() << "[ReminderService] Upcoming deadline:" << task.course << task.title
+                         << "due in" << hoursUntilDeadline << "hours";
+                emit reminderTriggered(task.course, task.title, task.deadline);
+            }
         }
     }
+    // Remove stale entries
+    m_notifiedTasks = activeKeys;
 }

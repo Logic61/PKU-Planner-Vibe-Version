@@ -132,7 +132,7 @@ TodoPage::TodoPage(QWidget *parent)
     setStyleSheet(QString("background:%1; font-family: 'Microsoft YaHei','Segoe UI', Arial; color: %2; font-weight:500;")
     .arg(Theme::BACKGROUND).arg(Theme::TEXT_PRIMARY));
 
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
+    mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(16, 16, 16, 16);
     mainLayout->setSpacing(14);
 
@@ -285,7 +285,6 @@ QWidget* TodoPage::createFilterBar()
                 subcontrol-origin: padding;
             }
             QComboBox::down-arrow {
-                image: url(:/icons/dropdown_arrow.png);
                 width: 10px;
                 height: 10px;
             }
@@ -639,6 +638,7 @@ void TodoPage::highlightTask(int taskIndex)
 }
 
 void TodoPage::setupUI() {
+    // Sync button is placed in mainLayout (not boardLayout which gets cleared on filter change)
     QPushButton *syncButton = new QPushButton("Sync Tasks from Teaching Platform");
     connect(syncButton, &QPushButton::clicked, this, [this]() {
         TeachingPlatformService *service = new TeachingPlatformService(this);
@@ -647,5 +647,8 @@ void TodoPage::setupUI() {
         });
         service->fetchTodoTasks();
     });
-    boardLayout->addWidget(syncButton);
+
+    if (mainLayout) {
+        mainLayout->addWidget(syncButton);
+    }
 }
